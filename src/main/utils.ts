@@ -1,8 +1,10 @@
 import { ipcMain, shell, dialog, app, session, clipboard } from "electron"
 import { WindowManager } from "./window"
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import fs = require("fs")
 import { ImageCallbackTypes, TouchBarTexts } from "../schema-types"
 import { initMainTouchBar } from "./touchbar"
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import fontList = require("font-list")
 
 export function setUtilsListeners(manager: WindowManager) {
@@ -23,10 +25,7 @@ export function setUtilsListeners(manager: WindowManager) {
     app.on("web-contents-created", (_, contents) => {
         contents.setWindowOpenHandler(details => {
             if (contents.getType() === "webview")
-                openExternal(
-                    details.url,
-                    details.disposition === "background-tab"
-                )
+                openExternal(details.url, details.disposition === "background-tab")
             return {
                 action: manager.hasWindow() ? "deny" : "allow",
             }
@@ -45,44 +44,35 @@ export function setUtilsListeners(manager: WindowManager) {
         openExternal(url, background)
     })
 
-    ipcMain.handle(
-        "show-error-box",
-        async (_, title, content, copy?: string) => {
-            if (manager.hasWindow() && copy != null) {
-                const response = await dialog.showMessageBox(
-                    manager.mainWindow,
-                    {
-                        type: "error",
-                        title: title,
-                        message: title,
-                        detail: content,
-                        buttons: ["OK", copy],
-                        cancelId: 0,
-                        defaultId: 0,
-                    }
-                )
-                if (response.response === 1) {
-                    clipboard.writeText(`${title}: ${content}`)
-                }
-            } else {
-                dialog.showErrorBox(title, content)
+    ipcMain.handle("show-error-box", async (_, title, content, copy?: string) => {
+        if (manager.hasWindow() && copy != null) {
+            const response = await dialog.showMessageBox(manager.mainWindow, {
+                type: "error",
+                title: title,
+                message: title,
+                detail: content,
+                buttons: ["OK", copy],
+                cancelId: 0,
+                defaultId: 0,
+            })
+            if (response.response === 1) {
+                clipboard.writeText(`${title}: ${content}`)
             }
+        } else {
+            dialog.showErrorBox(title, content)
         }
-    )
+    })
 
     ipcMain.handle(
         "show-message-box",
         async (_, title, message, confirm, cancel, defaultCancel, type) => {
             if (manager.hasWindow()) {
-                let response = await dialog.showMessageBox(manager.mainWindow, {
+                const response = await dialog.showMessageBox(manager.mainWindow, {
                     type: type,
                     title: title,
                     message: title,
                     detail: message,
-                    buttons:
-                        process.platform === "win32"
-                            ? ["Yes", "No"]
-                            : [confirm, cancel],
+                    buttons: process.platform === "win32" ? ["Yes", "No"] : [confirm, cancel],
                     cancelId: 1,
                     defaultId: defaultCancel ? 1 : 0,
                 })
@@ -93,54 +83,41 @@ export function setUtilsListeners(manager: WindowManager) {
         }
     )
 
-    ipcMain.handle(
-        "show-save-dialog",
-        async (_, filters: Electron.FileFilter[], path: string) => {
-            ipcMain.removeAllListeners("write-save-result")
-            if (manager.hasWindow()) {
-                let response = await dialog.showSaveDialog(manager.mainWindow, {
-                    defaultPath: path,
-                    filters: filters,
+    ipcMain.handle("show-save-dialog", async (_, filters: Electron.FileFilter[], path: string) => {
+        ipcMain.removeAllListeners("write-save-result")
+        if (manager.hasWindow()) {
+            const response = await dialog.showSaveDialog(manager.mainWindow, {
+                defaultPath: path,
+                filters: filters,
+            })
+            if (!response.canceled) {
+                ipcMain.handleOnce("write-save-result", (_, result, errmsg) => {
+                    fs.writeFile(response.filePath, result, err => {
+                        if (err) dialog.showErrorBox(errmsg, String(err))
+                    })
                 })
-                if (!response.canceled) {
-                    ipcMain.handleOnce(
-                        "write-save-result",
-                        (_, result, errmsg) => {
-                            fs.writeFile(response.filePath, result, err => {
-                                if (err)
-                                    dialog.showErrorBox(errmsg, String(err))
-                            })
-                        }
-                    )
-                    return true
-                }
+                return true
             }
-            return false
         }
-    )
+        return false
+    })
 
-    ipcMain.handle(
-        "show-open-dialog",
-        async (_, filters: Electron.FileFilter[]) => {
-            if (manager.hasWindow()) {
-                let response = await dialog.showOpenDialog(manager.mainWindow, {
-                    filters: filters,
-                    properties: ["openFile"],
-                })
-                if (!response.canceled) {
-                    try {
-                        return await fs.promises.readFile(
-                            response.filePaths[0],
-                            "utf-8"
-                        )
-                    } catch (err) {
-                        console.log(err)
-                    }
+    ipcMain.handle("show-open-dialog", async (_, filters: Electron.FileFilter[]) => {
+        if (manager.hasWindow()) {
+            const response = await dialog.showOpenDialog(manager.mainWindow, {
+                filters: filters,
+                properties: ["openFile"],
+            })
+            if (!response.canceled) {
+                try {
+                    return await fs.promises.readFile(response.filePaths[0], "utf-8")
+                } catch (err) {
+                    console.error(err)
                 }
             }
-            return null
         }
-    )
+        return null
+    })
 
     ipcMain.handle("get-cache", async () => {
         return await session.defaultSession.getCacheSize()
@@ -152,56 +129,42 @@ export function setUtilsListeners(manager: WindowManager) {
 
     app.on("web-contents-created", (_, contents) => {
         if (contents.getType() === "webview") {
-            contents.on(
-                "did-fail-load",
-                (event, code, desc, validated, isMainFrame) => {
-                    if (isMainFrame && manager.hasWindow()) {
-                        manager.mainWindow.webContents.send(
-                            "webview-error",
-                            desc
-                        )
-                    }
+            contents.on("did-fail-load", (event, code, desc, validated, isMainFrame) => {
+                if (isMainFrame && manager.hasWindow()) {
+                    manager.mainWindow.webContents.send("webview-error", desc)
                 }
-            )
+            })
             contents.on("context-menu", (_, params) => {
                 if (
-                    (params.hasImageContents ||
-                        params.selectionText ||
-                        params.linkURL) &&
+                    (params.hasImageContents || params.selectionText || params.linkURL) &&
                     manager.hasWindow()
                 ) {
                     if (params.hasImageContents) {
                         ipcMain.removeHandler("image-callback")
-                        ipcMain.handleOnce(
-                            "image-callback",
-                            (_, type: ImageCallbackTypes) => {
-                                switch (type) {
-                                    case ImageCallbackTypes.OpenExternal:
-                                    case ImageCallbackTypes.OpenExternalBg:
-                                        openExternal(
-                                            params.srcURL,
-                                            type ===
-                                                ImageCallbackTypes.OpenExternalBg
-                                        )
-                                        break
-                                    case ImageCallbackTypes.SaveAs:
-                                        contents.session.downloadURL(
-                                            params.srcURL
-                                        )
-                                        break
-                                    case ImageCallbackTypes.Copy:
-                                        contents.copyImageAt(params.x, params.y)
-                                        break
-                                    case ImageCallbackTypes.CopyLink:
-                                        clipboard.writeText(params.srcURL)
-                                        break
-                                }
+                        ipcMain.handleOnce("image-callback", (_, type: ImageCallbackTypes) => {
+                            switch (type) {
+                                case ImageCallbackTypes.OpenExternal:
+                                case ImageCallbackTypes.OpenExternalBg:
+                                    openExternal(
+                                        params.srcURL,
+                                        type === ImageCallbackTypes.OpenExternalBg
+                                    )
+                                    break
+                                case ImageCallbackTypes.SaveAs:
+                                    contents.session.downloadURL(params.srcURL)
+                                    break
+                                case ImageCallbackTypes.Copy:
+                                    contents.copyImageAt(params.x, params.y)
+                                    break
+                                case ImageCallbackTypes.CopyLink:
+                                    clipboard.writeText(params.srcURL)
+                                    break
                             }
-                        )
-                        manager.mainWindow.webContents.send(
-                            "webview-context-menu",
-                            [params.x, params.y]
-                        )
+                        })
+                        manager.mainWindow.webContents.send("webview-context-menu", [
+                            params.x,
+                            params.y,
+                        ])
                     } else {
                         manager.mainWindow.webContents.send(
                             "webview-context-menu",
@@ -224,16 +187,14 @@ export function setUtilsListeners(manager: WindowManager) {
                         )
                         .then(() => {
                             if (manager.hasWindow()) {
-                                manager.mainWindow.webContents.send(
-                                    "webview-context-menu"
-                                )
+                                manager.mainWindow.webContents.send("webview-context-menu")
                             }
                         })
                 }
             })
             contents.on("before-input-event", (_, input) => {
                 if (manager.hasWindow()) {
-                    let contents = manager.mainWindow.webContents
+                    const contents = manager.mainWindow.webContents
                     contents.send("webview-keydown", input)
                 }
             })
@@ -257,18 +218,15 @@ export function setUtilsListeners(manager: WindowManager) {
     })
 
     ipcMain.on("is-maximized", event => {
-        event.returnValue =
-            Boolean(manager.mainWindow) && manager.mainWindow.isMaximized()
+        event.returnValue = Boolean(manager.mainWindow) && manager.mainWindow.isMaximized()
     })
 
     ipcMain.on("is-focused", event => {
-        event.returnValue =
-            manager.hasWindow() && manager.mainWindow.isFocused()
+        event.returnValue = manager.hasWindow() && manager.mainWindow.isFocused()
     })
 
     ipcMain.on("is-fullscreen", event => {
-        event.returnValue =
-            manager.hasWindow() && manager.mainWindow.isFullScreen()
+        event.returnValue = manager.hasWindow() && manager.mainWindow.isFullScreen()
     })
 
     ipcMain.handle("request-focus", () => {

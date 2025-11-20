@@ -9,8 +9,7 @@ import { ContextMenuType } from "../scripts/models/app"
 const getPage = (state: RootState) => state.page
 const getSettings = (state: RootState) => state.app.settings.display
 const getMenu = (state: RootState) => state.app.menu
-const getContext = (state: RootState) =>
-    state.app.contextMenu.type != ContextMenuType.Hidden
+const getContext = (state: RootState) => state.app.contextMenu.type != ContextMenuType.Hidden
 
 const mapStateToProps = createSelector(
     [getPage, getSettings, getMenu, getContext],

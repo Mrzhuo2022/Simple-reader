@@ -1,5 +1,5 @@
 import * as React from "react"
-import * as ReactDOM from "react-dom"
+import { createRoot } from "react-dom/client"
 import { Provider } from "react-redux"
 import { initializeIcons } from "@fluentui/react/lib/Icons"
 import Root from "./components/root"
@@ -23,9 +23,10 @@ window.utils.initFontList().then(fonts => {
     window.fontList.push(...fonts)
 })
 
-ReactDOM.render(
+const container = document.getElementById("app")
+const root = createRoot(container!)
+root.render(
     <Provider store={rootStore}>
         <Root />
-    </Provider>,
-    document.getElementById("app")
+    </Provider>
 )

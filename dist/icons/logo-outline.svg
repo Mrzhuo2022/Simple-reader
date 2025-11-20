@@ -1,60 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="350" height="350" viewBox="0 0 350 350">
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <style>
       :root {
-        --white: #fff;
-        --primary: #e1dfdd;
-      }
-
-      .cls-1 {
-        clip-path: url(#clip-Web_1280_5);
-      }
-
-      .cls-2, .cls-3 {
-        fill: var(--white);
-      }
-
-      .cls-2 {
-        stroke: var(--primary);
-        stroke-width: 5px;
-      }
-
-      .cls-4 {
-        fill: var(--primary);
-      }
-
-      .cls-5 {
-        fill: var(--white);
-        font-size: 167px;
-        font-family: Arial-BoldMT, Arial;
-        font-weight: 700;
-      }
-
-      .cls-6 {
-        stroke: none;
-      }
-
-      .cls-7 {
-        fill: none;
+        --bg: #ffffff;
+        --stroke: #e1dfdd;
+        --icon: #666666;
       }
     </style>
-    <clipPath id="clip-Web_1280_5">
-      <rect width="350" height="350"/>
-    </clipPath>
   </defs>
-  <g class="cls-1">
-    <rect class="cls-3" width="350" height="350"/>
-    <g class="cls-2" transform="translate(45 25)">
-      <rect class="cls-6" width="280" height="280" rx="5"/>
-      <rect class="cls-7" x="2.5" y="2.5" width="275" height="275" rx="2.5"/>
-    </g>
-    <rect class="cls-3" width="235" height="235" rx="5" transform="translate(30 85)"/>
-    <g class="cls-2" transform="translate(35 90)">
-      <rect class="cls-6" width="225" height="225" rx="5"/>
-      <rect class="cls-7" x="2.5" y="2.5" width="220" height="220" rx="2.5"/>
-    </g>
-    <rect class="cls-3" width="180" height="180" rx="5" transform="translate(20 150)"/>
-    <rect class="cls-4" width="170" height="170" rx="5" transform="translate(25 155)"/>
-    <text id="F" class="cls-5" transform="translate(59 301)"><tspan x="0" y="0">F</tspan></text>
+  <!-- Background -->
+  <rect x="32" y="32" width="448" height="448" rx="110" ry="110" fill="var(--bg)" stroke="var(--stroke)" stroke-width="8" />
+  <!-- RSS Icon -->
+  <g fill="none" stroke="var(--icon)" stroke-width="50" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 340 140 C 340 60, 180 60, 180 180 C 180 300, 332 280, 332 380 C 332 450, 220 450, 170 400" />
   </g>
+  <circle cx="160" cy="350" r="30" fill="var(--icon)" />
 </svg>

@@ -1,5 +1,7 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import windowStateKeeper = require("electron-window-state")
 import { BrowserWindow, nativeTheme, app } from "electron"
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import path = require("path")
 import { setThemeListener } from "./settings"
 import { setUtilsListeners } from "./utils"
@@ -40,10 +42,10 @@ export class WindowManager {
         })
     }
 
-    createWindow = () => {
+    createWindow = (): void => {
         if (!this.hasWindow()) {
             this.mainWindow = new BrowserWindow({
-                title: "Fluent Reader",
+                title: "Simple Reader",
                 backgroundColor:
                     process.platform === "darwin"
                         ? "#00000000"
@@ -75,11 +77,8 @@ export class WindowManager {
             this.mainWindow.on("ready-to-show", () => {
                 this.mainWindow.show()
                 this.mainWindow.focus()
-                if (!app.isPackaged) this.mainWindow.webContents.openDevTools()
             })
-            this.mainWindow.loadFile(
-                (app.isPackaged ? "dist/" : "") + "index.html"
-            )
+            this.mainWindow.loadFile((app.isPackaged ? "dist/" : "") + "index.html")
 
             this.mainWindow.on("maximize", () => {
                 this.mainWindow.webContents.send("maximized")
@@ -111,7 +110,7 @@ export class WindowManager {
         }
     }
 
-    zoom = () => {
+    zoom = (): void => {
         if (this.hasWindow()) {
             if (this.mainWindow.isMaximized()) {
                 this.mainWindow.unmaximize()
@@ -121,7 +120,7 @@ export class WindowManager {
         }
     }
 
-    hasWindow = () => {
+    hasWindow = (): boolean => {
         return this.mainWindow !== null && !this.mainWindow.isDestroyed()
     }
 }

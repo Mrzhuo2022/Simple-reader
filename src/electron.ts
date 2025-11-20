@@ -4,6 +4,9 @@ import { store } from "./main/settings"
 import performUpdate from "./main/update-scripts"
 import { WindowManager } from "./main/window"
 
+// 禁用GPU缓存以避免缓存权限错误
+app.commandLine.appendSwitch("disable-gpu-shader-disk-cache")
+
 if (!process.mas) {
     const locked = app.requestSingleInstanceLock()
     if (!locked) {
@@ -12,8 +15,7 @@ if (!process.mas) {
 }
 
 if (!app.isPackaged) app.setAppUserModelId(process.execPath)
-else if (process.platform === "win32")
-    app.setAppUserModelId("me.hyliu.fluentreader")
+else if (process.platform === "win32") app.setAppUserModelId("me.evarle.Simple-reader")
 
 let restarting = false
 
@@ -40,7 +42,7 @@ if (process.platform === "darwin") {
                     label: "Quit",
                     accelerator: "Command+Q",
                     click: () => {
-                        if (winManager.hasWindow) winManager.mainWindow.close()
+                        if (winManager.hasWindow()) winManager.mainWindow.close()
                     },
                 },
             ],
@@ -83,15 +85,14 @@ if (process.platform === "darwin") {
                     label: "Close",
                     accelerator: "Command+W",
                     click: () => {
-                        if (winManager.hasWindow) winManager.mainWindow.close()
+                        if (winManager.hasWindow()) winManager.mainWindow.close()
                     },
                 },
                 {
                     label: "Minimize",
                     accelerator: "Command+M",
                     click: () => {
-                        if (winManager.hasWindow())
-                            winManager.mainWindow.minimize()
+                        if (winManager.hasWindow()) winManager.mainWindow.minimize()
                     },
                 },
                 { label: "Zoom", click: () => winManager.zoom() },
@@ -123,16 +124,16 @@ app.on("window-all-closed", () => {
 ipcMain.handle("import-all-settings", (_, configs: SchemaTypes) => {
     restarting = true
     store.clear()
-    for (let [key, value] of Object.entries(configs)) {
-        // @ts-ignore
-        store.set(key, value)
+    for (const [key, value] of Object.entries(configs)) {
+        store.set(key as keyof SchemaTypes, value as SchemaTypes[keyof SchemaTypes])
     }
     performUpdate(store)
     nativeTheme.themeSource = store.get("theme", ThemeSettings.Default)
-    setTimeout(
-        () => {
+    // Wait for the theme update to propagate before closing the window on macOS to avoid visual glitches
+    const closeDelay = process.platform === "darwin" ? 1000 : 0
+    setTimeout(() => {
+        if (winManager.mainWindow) {
             winManager.mainWindow.close()
-        },
-        process.platform === "darwin" ? 1000 : 0
-    ) // Why ???
+        }
+    }, closeDelay)
 })

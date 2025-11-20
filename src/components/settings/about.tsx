@@ -7,45 +7,34 @@ class AboutTab extends React.Component {
         <div className="tab-body">
             <Stack className="settings-about" horizontalAlign="center">
                 <img src="icons/logo.svg" style={{ width: 120, height: 120 }} />
-                <h3 style={{ fontWeight: 600 }}>Fluent Reader</h3>
+                <h3 style={{ fontWeight: 600 }}>
+                    {intl.get("settings.appName") || "Simple Reader"}
+                </h3>
                 <small>
                     {intl.get("settings.version")} {window.utils.getVersion()}
                 </small>
-                <p className="settings-hint">
-                    Copyright © 2020 Haoyuan Liu. All rights reserved.
+                <p className="settings-hint">Copyright © 2025 Evarle Zhuo. All rights reserved.</p>
+                <p className="settings-hint" style={{ marginTop: -12 }}>
+                    Based on{" "}
+                    <Link
+                        onClick={() =>
+                            window.utils.openExternal("https://github.com/yang991178/fluent-reader")
+                        }
+                    >
+                        Fluent Reader
+                    </Link>{" "}
+                    by Haoyuan Liu
                 </p>
-                <Stack
-                    horizontal
-                    horizontalAlign="center"
-                    tokens={{ childrenGap: 12 }}>
+                <Stack horizontal horizontalAlign="center" tokens={{ childrenGap: 12 }}>
                     <small>
                         <Link
                             onClick={() =>
                                 window.utils.openExternal(
-                                    "https://github.com/yang991178/fluent-reader/wiki/Support#keyboard-shortcuts"
+                                    "https://github.com/Mrzhuo2022/Simple-reader"
                                 )
-                            }>
-                            {intl.get("settings.shortcuts")}
-                        </Link>
-                    </small>
-                    <small>
-                        <Link
-                            onClick={() =>
-                                window.utils.openExternal(
-                                    "https://github.com/yang991178/fluent-reader"
-                                )
-                            }>
+                            }
+                        >
                             {intl.get("settings.openSource")}
-                        </Link>
-                    </small>
-                    <small>
-                        <Link
-                            onClick={() =>
-                                window.utils.openExternal(
-                                    "https://github.com/yang991178/fluent-reader/issues"
-                                )
-                            }>
-                            {intl.get("settings.feedback")}
                         </Link>
                     </small>
                 </Stack>

@@ -55,20 +55,16 @@ body {
     margin: 0;
 }
 body:lang(zh-CN) {
-    font-family: "Segoe UI", "Source Han Sans SC Regular", "Microsoft YaHei",
-        sans-serif;
+    font-family: "Segoe UI", "Source Han Sans SC Regular", "Microsoft YaHei", sans-serif;
 }
 body:lang(zh-TW) {
-    font-family: "Segoe UI", "Source Han Sans TC Regular", "Microsoft JhengHei",
-        sans-serif;
+    font-family: "Segoe UI", "Source Han Sans TC Regular", "Microsoft JhengHei", sans-serif;
 }
 body:lang(ja) {
-    font-family: "Segoe UI", "Source Han Sans JP Regular", "Yu Gothic UI",
-        sans-serif;
+    font-family: "Segoe UI", "Source Han Sans JP Regular", "Yu Gothic UI", sans-serif;
 }
 body:lang(ko) {
-    font-family: "Segoe UI", "Source Han Sans KR Regular", "Malgun Gothic",
-        sans-serif;
+    font-family: "Segoe UI", "Source Han Sans KR Regular", "Malgun Gothic", sans-serif;
 }
 body.win32,
 body.linux {
@@ -124,7 +120,7 @@ i.ms-Nav-chevron {
     height: 32px;
 }
 .ms-Nav-groupContent {
-    margin-bottom: 24px;
+    margin-bottom: 8px;
 }
 .ms-ActivityItem-activityTypeIcon,
 .ms-ActivityItem-timeStamp {

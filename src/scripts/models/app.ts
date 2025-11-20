@@ -10,13 +10,8 @@ import {
     updateFavicon,
 } from "./source"
 import { RSSItem, ItemActionTypes, FETCH_ITEMS, fetchItems } from "./item"
-import {
-    ActionStatus,
-    AppThunk,
-    getWindowBreakpoint,
-    initTouchBarWithTexts,
-} from "../utils"
-import { INIT_FEEDS, FeedActionTypes, ALL, initFeeds } from "./feed"
+import { ActionStatus, AppThunk, getWindowBreakpoint, initTouchBarWithTexts } from "../utils"
+import { INIT_FEEDS, FeedActionTypes, ALL, STARRED, initFeeds } from "./feed"
 import {
     SourceGroupActionTypes,
     UPDATE_SOURCE_GROUP,
@@ -25,13 +20,7 @@ import {
     REMOVE_SOURCE_FROM_GROUP,
     REORDER_SOURCE_GROUPS,
 } from "./group"
-import {
-    PageActionTypes,
-    SELECT_PAGE,
-    PageType,
-    selectAllArticles,
-    showItemFromId,
-} from "./page"
+import { PageActionTypes, SELECT_PAGE, PageType, selectAllArticles, showItemFromId } from "./page"
 import { getCurrentLocale, setThemeDefaultFont } from "../settings"
 import locales from "../i18n/_locales"
 import { SYNC_SERVICE, ServiceActionTypes } from "./service"
@@ -60,12 +49,7 @@ export class AppLog {
     iid?: number
     time: Date
 
-    constructor(
-        type: AppLogType,
-        title: string,
-        details: string = null,
-        iid: number = null
-    ) {
+    constructor(type: AppLogType, title: string, details: string = null, iid: number = null) {
         this.type = type
         this.title = title
         this.details = details
@@ -105,6 +89,12 @@ export class AppState {
         target?: [RSSItem, string] | number[] | [string, string]
     }
 
+    textTranslation = {
+        display: false,
+        text: "",
+        position: null as [number, number],
+    }
+
     constructor() {
         this.contextMenu = {
             type: ContextMenuType.Hidden,
@@ -119,6 +109,8 @@ export const OPEN_VIEW_MENU = "OPEN_VIEW_MENU"
 export const OPEN_GROUP_MENU = "OPEN_GROUP_MENU"
 export const OPEN_IMAGE_MENU = "OPEN_IMAGE_MENU"
 export const OPEN_MARK_ALL_MENU = "OPEN_MARK_ALL_MENU"
+export const OPEN_TRANSLATION_POPUP = "OPEN_TRANSLATION_POPUP"
+export const CLOSE_TRANSLATION_POPUP = "CLOSE_TRANSLATION_POPUP"
 
 interface CloseContextMenuAction {
     type: typeof CLOSE_CONTEXT_MENU
@@ -164,6 +156,18 @@ export type ContextMenuActionTypes =
     | OpenGroupMenuAction
     | OpenImageMenuAction
     | OpenMarkAllMenuAction
+    | OpenTranslationPopupAction
+    | CloseTranslationPopupAction
+
+interface OpenTranslationPopupAction {
+    type: typeof OPEN_TRANSLATION_POPUP
+    text: string
+    position: [number, number]
+}
+
+interface CloseTranslationPopupAction {
+    type: typeof CLOSE_TRANSLATION_POPUP
+}
 
 export const TOGGLE_LOGS = "TOGGLE_LOGS"
 export const PUSH_NOTIFICATION = "PUSH_NOTIFICATION"
@@ -203,10 +207,7 @@ interface FreeMemoryAction {
     type: typeof FREE_MEMORY
     iids: Set<number>
 }
-export type SettingsActionTypes =
-    | ToggleSettingsAction
-    | SaveSettingsAction
-    | FreeMemoryAction
+export type SettingsActionTypes = ToggleSettingsAction | SaveSettingsAction | FreeMemoryAction
 
 export function closeContextMenu(): AppThunk {
     return (dispatch, getState) => {
@@ -245,10 +246,7 @@ export const openViewMenu = (): ContextMenuActionTypes => ({
     type: OPEN_VIEW_MENU,
 })
 
-export function openGroupMenu(
-    sids: number[],
-    event: React.MouseEvent
-): ContextMenuActionTypes {
+export function openGroupMenu(sids: number[], event: React.MouseEvent): ContextMenuActionTypes {
     return {
         type: OPEN_GROUP_MENU,
         event: event.nativeEvent,
@@ -256,9 +254,7 @@ export function openGroupMenu(
     }
 }
 
-export function openImageMenu(
-    position: [number, number]
-): ContextMenuActionTypes {
+export function openImageMenu(position: [number, number]): ContextMenuActionTypes {
     return {
         type: OPEN_IMAGE_MENU,
         position: position,
@@ -268,6 +264,23 @@ export function openImageMenu(
 export const openMarkAllMenu = (): ContextMenuActionTypes => ({
     type: OPEN_MARK_ALL_MENU,
 })
+
+export function openTranslationPopup(
+    text: string,
+    position: [number, number]
+): ContextMenuActionTypes {
+    return {
+        type: OPEN_TRANSLATION_POPUP,
+        text,
+        position,
+    }
+}
+
+export function closeTranslationPopup(): ContextMenuActionTypes {
+    return {
+        type: CLOSE_TRANSLATION_POPUP,
+    }
+}
 
 export function toggleMenu(): AppThunk {
     return (dispatch, getState) => {
@@ -304,7 +317,7 @@ export function exitSettings(): AppThunk<Promise<void>> {
 function freeMemory(): AppThunk {
     return (dispatch, getState) => {
         const iids = new Set<number>()
-        for (let feed of Object.values(getState().feeds)) {
+        for (const feed of Object.values(getState().feeds)) {
             if (feed.loaded) feed.iids.forEach(iids.add, iids)
         }
         dispatch({
@@ -322,7 +335,7 @@ export function setupAutoFetch(): AppThunk {
             if (!interval) interval = window.settings.getFetchInterval()
             if (interval) {
                 fetchTimeout = setTimeout(() => {
-                    let state = getState()
+                    const state = getState()
                     if (!state.app.settings.display) {
                         if (!state.app.fetchingItems) dispatch(fetchItems(true))
                     } else {
@@ -339,15 +352,12 @@ export function pushNotification(item: RSSItem): AppThunk {
     return (dispatch, getState) => {
         const sourceName = getState().sources[item.source].name
         if (!window.utils.isFocused()) {
-            const options = { body: sourceName } as any
+            const options: NotificationOptions = { body: sourceName }
             if (item.thumb) options.icon = item.thumb
             const notification = new Notification(item.title, options)
             notification.onclick = () => {
                 const state = getState()
-                if (
-                    state.sources[item.source].openTarget ===
-                    SourceOpenTarget.External
-                ) {
+                if (state.sources[item.source].openTarget === SourceOpenTarget.External) {
                     window.utils.openExternal(item.link)
                 } else if (!state.app.settings.display) {
                     window.utils.focus()
@@ -380,7 +390,7 @@ export const initIntlDone = (locale: string): InitIntlAction => {
 
 export function initIntl(): AppThunk<Promise<void>> {
     return dispatch => {
-        let locale = getCurrentLocale()
+        const locale = getCurrentLocale()
         return intl
             .init({
                 currentLocale: locale,
@@ -584,6 +594,13 @@ export function appReducer(
                         menuKey: ALL,
                         title: intl.get("allArticles"),
                     }
+                case PageType.Starred:
+                    return {
+                        ...state,
+                        menu: state.menu && action.keepMenu,
+                        menuKey: STARRED,
+                        title: intl.get("menu.starred"),
+                    }
                 case PageType.Sources:
                     return {
                         ...state,
@@ -592,6 +609,7 @@ export function appReducer(
                         title: action.title,
                     }
             }
+            return state
         case CLOSE_CONTEXT_MENU:
             return {
                 ...state,
@@ -656,6 +674,23 @@ export function appReducer(
                     event: "#mark-all-toggle",
                 },
             }
+        case OPEN_TRANSLATION_POPUP:
+            return {
+                ...state,
+                textTranslation: {
+                    display: true,
+                    text: action.text,
+                    position: action.position,
+                },
+            }
+        case CLOSE_TRANSLATION_POPUP:
+            return {
+                ...state,
+                textTranslation: {
+                    ...state.textTranslation,
+                    display: false,
+                },
+            }
         case TOGGLE_MENU:
             return {
                 ...state,
@@ -698,12 +733,7 @@ export function appReducer(
                     notify: true,
                     logs: [
                         ...state.logMenu.logs,
-                        new AppLog(
-                            AppLogType.Article,
-                            action.title,
-                            action.source,
-                            action.iid
-                        ),
+                        new AppLog(AppLogType.Article, action.title, action.source, action.iid),
                     ],
                 },
             }

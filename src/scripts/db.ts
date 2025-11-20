@@ -22,7 +22,7 @@ sdbSchema
     .addNullable(["iconurl", "serviceRef", "rules"])
     .addIndex("idxURL", ["url"], true)
 
-const idbSchema = lf.schema.create("itemsDB", 1)
+const idbSchema = lf.schema.create("itemsDB", 3)
 idbSchema
     .createTable("items")
     .addColumn("_id", lf.Type.INTEGER)
@@ -40,8 +40,18 @@ idbSchema
     .addColumn("starred", lf.Type.BOOLEAN)
     .addColumn("hidden", lf.Type.BOOLEAN)
     .addColumn("notify", lf.Type.BOOLEAN)
+    .addColumn("autoTranslate", lf.Type.BOOLEAN)
+    .addColumn("autoSummarize", lf.Type.BOOLEAN)
+    .addColumn("autoFullText", lf.Type.BOOLEAN)
     .addColumn("serviceRef", lf.Type.STRING)
-    .addNullable(["thumb", "creator", "serviceRef"])
+    .addNullable([
+        "thumb",
+        "creator",
+        "serviceRef",
+        "autoTranslate",
+        "autoSummarize",
+        "autoFullText",
+    ])
     .addIndex("idxDate", ["date"], false, lf.Order.DESC)
     .addIndex("idxService", ["serviceRef"], false)
 
@@ -60,10 +70,21 @@ async function onUpgradeSourceDB(rawDb: lf.raw.BackStore) {
     }
 }
 
+async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
+    const version = rawDb.getVersion()
+    if (version < 2) {
+        await rawDb.addTableColumn("items", "autoTranslate", null)
+        await rawDb.addTableColumn("items", "autoSummarize", null)
+    }
+    if (version < 3) {
+        await rawDb.addTableColumn("items", "autoFullText", null)
+    }
+}
+
 export async function init() {
     sourcesDB = await sdbSchema.connect({ onUpgrade: onUpgradeSourceDB })
     sources = sourcesDB.getSchema().table("sources")
-    itemsDB = await idbSchema.connect()
+    itemsDB = await idbSchema.connect({ onUpgrade: onUpgradeItemDB })
     items = itemsDB.getSchema().table("items")
     if (window.settings.getNeDBStatus()) {
         await migrateNeDB()
@@ -76,14 +97,14 @@ async function migrateNeDB() {
             filename: "sources",
             autoload: true,
             onload: err => {
-                if (err) window.console.log(err)
+                if (err) console.error(err)
             },
         })
         const idb = new Datastore<RSSItem>({
             filename: "items",
             autoload: true,
             onload: err => {
-                if (err) window.console.log(err)
+                if (err) console.error(err)
             },
         })
         const sourceDocs = await new Promise<RSSSource[]>(resolve => {
@@ -97,19 +118,17 @@ async function migrateNeDB() {
             })
         })
         const sRows = sourceDocs.map(doc => {
-            if (doc.serviceRef !== undefined)
-                doc.serviceRef = String(doc.serviceRef)
-            // @ts-ignore
-            delete doc._id
-            if (!doc.fetchFrequency) doc.fetchFrequency = 0
-            doc.textDir = 0
-            doc.hidden = false
-            return sources.createRow(doc)
+            if (doc.serviceRef !== undefined) doc.serviceRef = String(doc.serviceRef)
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { _id, ...sourceData } = doc as typeof doc & { _id?: unknown }
+            if (!sourceData.fetchFrequency) sourceData.fetchFrequency = 0
+            sourceData.textDir = 0
+            sourceData.hidden = false
+            return sources.createRow(sourceData)
         })
         const iRows = itemDocs.map(doc => {
-            if (doc.serviceRef !== undefined)
-                doc.serviceRef = String(doc.serviceRef)
-            if (!doc.title) doc.title = intl.get("article.untitled")
+            if (doc.serviceRef !== undefined) doc.serviceRef = String(doc.serviceRef)
+            if (!doc.title) doc.title = intl.get("nav.untitled")
             if (!doc.content) doc.content = ""
             if (!doc.snippet) doc.snippet = ""
             delete doc._id

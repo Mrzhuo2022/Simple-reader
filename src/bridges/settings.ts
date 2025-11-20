@@ -5,8 +5,11 @@ import {
     SearchEngines,
     ServiceConfigs,
     ViewConfigs,
+    AIConfigs,
+    Shortcuts,
 } from "../schema-types"
 import { ipcRenderer } from "electron"
+import { AICacheEntry } from "../scripts/models/services/aiCache"
 
 const settingsBridge = {
     saveGroups: (groups: SourceGroup[]) => {
@@ -32,7 +35,7 @@ const settingsBridge = {
     getProxy: (): string => {
         return ipcRenderer.sendSync("get-proxy")
     },
-    setProxy: (address: string = null) => {
+    setProxy: (address?: string | null) => {
         ipcRenderer.invoke("set-proxy", address)
     },
 
@@ -52,7 +55,7 @@ const settingsBridge = {
     shouldUseDarkColors: (): boolean => {
         return ipcRenderer.sendSync("get-theme-dark-color")
     },
-    addThemeUpdateListener: (callback: (shouldDark: boolean) => any) => {
+    addThemeUpdateListener: (callback: (shouldDark: boolean) => void) => {
         ipcRenderer.on("theme-updated", (_, shouldDark) => {
             callback(shouldDark)
         })
@@ -124,11 +127,42 @@ const settingsBridge = {
         ipcRenderer.invoke("set-nedb-status", flag)
     },
 
-    getAll: () => {
-        return ipcRenderer.sendSync("get-all-settings") as Object
+    getShortcuts: (): Shortcuts => {
+        return ipcRenderer.sendSync("get-shortcuts")
+    },
+    setShortcuts: (shortcuts: Shortcuts) => {
+        ipcRenderer.invoke("set-shortcuts", shortcuts)
     },
 
-    setAll: configs => {
+    getAIConfigs: (): AIConfigs => {
+        return ipcRenderer.sendSync("get-ai-configs")
+    },
+    setAIConfigs: (configs: AIConfigs) => {
+        ipcRenderer.invoke("set-ai-configs", configs)
+    },
+
+    // AI Cache
+    getAICache: async (itemId: string): Promise<AICacheEntry | null> => {
+        return ipcRenderer.invoke("ai-cache-get", itemId)
+    },
+    saveAISummary: async (itemId: string, summary: string): Promise<void> => {
+        return ipcRenderer.invoke("ai-cache-save-summary", itemId, summary)
+    },
+    saveAITranslation: async (itemId: string, translation: string): Promise<void> => {
+        return ipcRenderer.invoke("ai-cache-save-translation", itemId, translation)
+    },
+    saveTitleTranslation: async (itemId: string, titleTranslation: string): Promise<void> => {
+        return ipcRenderer.invoke("ai-cache-save-title-translation", itemId, titleTranslation)
+    },
+    clearOldAICache: async (daysToKeep: number = 30): Promise<void> => {
+        return ipcRenderer.invoke("ai-cache-clear-old", daysToKeep)
+    },
+
+    getAll: (): Record<string, unknown> => {
+        return ipcRenderer.sendSync("get-all-settings") as Record<string, unknown>
+    },
+
+    setAll: (configs: Record<string, unknown>): void => {
         ipcRenderer.invoke("import-all-settings", configs)
     },
 }

@@ -1,25 +1,19 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import { FeedProps } from "./feed"
-import {
-    PrimaryButton,
-    FocusZone,
-    FocusZoneDirection,
-    List,
-} from "office-ui-fabric-react"
+import { PrimaryButton, FocusZone, FocusZoneDirection, List } from "@fluentui/react"
 import { RSSItem } from "../../scripts/models/item"
 import { AnimationClassNames } from "@fluentui/react"
 import { ViewType } from "../../schema-types"
 import ListCard from "../cards/list-card"
 import MagazineCard from "../cards/magazine-card"
 import CompactCard from "../cards/compact-card"
-import { Card } from "../cards/card"
+import { CardProps } from "../cards/card"
 
 class ListFeed extends React.Component<FeedProps> {
     onRenderItem = (item: RSSItem) => {
-        const props = {
+        const props: CardProps = {
             feedId: this.props.feed._id,
-            key: item._id,
             item: item,
             source: this.props.sourceMap[item.source],
             filter: this.props.filter,
@@ -28,21 +22,18 @@ class ListFeed extends React.Component<FeedProps> {
             markRead: this.props.markRead,
             contextMenu: this.props.contextMenu,
             showItem: this.props.showItem,
-        } as Card.Props
-        if (
-            this.props.viewType === ViewType.List &&
-            this.props.currentItem === item._id
-        ) {
+        }
+        if (this.props.viewType === ViewType.List && this.props.currentItem === item._id) {
             props.selected = true
         }
 
         switch (this.props.viewType) {
             case ViewType.Magazine:
-                return <MagazineCard {...props} />
+                return <MagazineCard key={item._id} {...props} />
             case ViewType.Compact:
-                return <CompactCard {...props} />
+                return <CompactCard key={item._id} {...props} />
             default:
-                return <ListCard {...props} />
+                return <ListCard key={item._id} {...props} />
         }
     }
 
@@ -60,9 +51,7 @@ class ListFeed extends React.Component<FeedProps> {
     canFocusChild = (el: HTMLElement) => {
         if (el.id === "load-more") {
             const container = document.getElementById("refocus")
-            const result =
-                container.scrollTop >
-                container.scrollHeight - 2 * container.offsetHeight
+            const result = container.scrollTop > container.scrollHeight - 2 * container.offsetHeight
             if (!result) container.scrollTop += 100
             return result
         } else {
@@ -79,7 +68,8 @@ class ListFeed extends React.Component<FeedProps> {
                     direction={FocusZoneDirection.vertical}
                     className={this.getClassName()}
                     shouldReceiveFocus={this.canFocusChild}
-                    data-is-scrollable>
+                    data-is-scrollable
+                >
                     <List
                         className={AnimationClassNames.slideUpIn10}
                         items={this.props.items}
@@ -93,14 +83,12 @@ class ListFeed extends React.Component<FeedProps> {
                                 id="load-more"
                                 text={intl.get("loadMore")}
                                 disabled={this.props.feed.loading}
-                                onClick={() =>
-                                    this.props.loadMore(this.props.feed)
-                                }
+                                onClick={() => this.props.loadMore(this.props.feed)}
                             />
                         </div>
                     ) : null}
                     {this.props.items.length === 0 && (
-                        <div className="empty">{intl.get("article.empty")}</div>
+                        <div className="empty">{intl.get("nav.empty")}</div>
                     )}
                 </FocusZone>
             )

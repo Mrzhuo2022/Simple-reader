@@ -23,7 +23,7 @@ class Time extends React.Component<TimeProps> {
 
     displayTime(past: Date, now: Date): string {
         // difference in seconds
-        let diff = (now.getTime() - past.getTime()) / 60000
+        const diff = (now.getTime() - past.getTime()) / 60000
         if (diff < 1) return intl.get("time.now")
         else if (diff < 60) return Math.floor(diff) + intl.get("time.m")
         else if (diff < 1440) return Math.floor(diff / 60) + intl.get("time.h")
@@ -31,11 +31,7 @@ class Time extends React.Component<TimeProps> {
     }
 
     render() {
-        return (
-            <span className="time">
-                {this.displayTime(this.props.date, this.state.now)}
-            </span>
-        )
+        return <span className="time">{this.displayTime(this.props.date, this.state.now)}</span>
     }
 }
 

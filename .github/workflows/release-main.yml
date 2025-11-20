@@ -32,46 +32,82 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   tag_name: ${{ github.ref }}
-                  release_name: Fluent Reader v${{ steps.package-version.outputs.current-version }}
+                  release_name: Simple Reader v${{ steps.package-version.outputs.current-version }}
                   draft: true
                   prerelease: false
 
-            - name: Upload x64 exe to release assets
+            - name: Upload win-x64 zip to release assets
               uses: actions/upload-release-asset@v1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./bin/win32/x64/Fluent Reader Setup ${{ steps.package-version.outputs.current-version }}.exe
-                  asset_name: Fluent.Reader.Setup.${{ steps.package-version.outputs.current-version }}.x64.exe
-                  asset_content_type: application/vnd.microsoft.portable-executable
-
-            - name: Upload x86 exe to release assets
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./bin/win32/ia32/Fluent Reader Setup ${{ steps.package-version.outputs.current-version }}.exe
-                  asset_name: Fluent.Reader.Setup.${{ steps.package-version.outputs.current-version }}.x86.exe
-                  asset_content_type: application/vnd.microsoft.portable-executable
-
-            - name: Upload x64 zip to release assets
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./bin/win32/x64/Fluent Reader-${{ steps.package-version.outputs.current-version }}-win.zip
-                  asset_name: Fluent.Reader.Unpacked.${{ steps.package-version.outputs.current-version }}.x64.zip
+                  asset_path: "./bin/win32/x64/Simple Reader-win32-x64.zip"
+                  asset_name: Simple.Reader.${{ steps.package-version.outputs.current-version }}.win-x64.zip
                   asset_content_type: application/zip
 
-            - name: Upload x86 zip to release assets
+    release-mac:
+        needs: release
+        runs-on: macos-latest
+
+        steps:
+            - uses: actions/checkout@v2
+
+            - name: Build and package the app (macOS)
+              run: |
+                  npm install
+                  npm run build
+                  npm run package-mac
+
+            - name: Get app version
+              id: package-version
+              uses: martinbeentjes/npm-get-version-action@master
+
+            - name: Get release
+              id: get_release
+              uses: bruceadams/get-release@v1.2.0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload macOS dmg to release assets
               uses: actions/upload-release-asset@v1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: ./bin/win32/ia32/Fluent Reader-${{ steps.package-version.outputs.current-version }}-ia32-win.zip
-                  asset_name: Fluent.Reader.Unpacked.${{ steps.package-version.outputs.current-version }}.x86.zip
-                  asset_content_type: application/zip
+                  upload_url: ${{ steps.get_release.outputs.upload_url }}
+                  asset_path: "./bin/mac/x64/Simple Reader-${{ steps.package-version.outputs.current-version }}.dmg"
+                  asset_name: Simple.Reader.${{ steps.package-version.outputs.current-version }}.mac-x64.dmg
+                  asset_content_type: application/x-apple-diskimage
+
+    release-linux:
+        needs: release
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v2
+
+            - name: Build and package the app (Linux)
+              run: |
+                  npm install
+                  npm run build
+                  npm run package-linux
+
+            - name: Get app version
+              id: package-version
+              uses: martinbeentjes/npm-get-version-action@master
+
+            - name: Get release
+              id: get_release
+              uses: bruceadams/get-release@v1.2.0
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload Linux AppImage to release assets
+              uses: actions/upload-release-asset@v1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.get_release.outputs.upload_url }}
+                  asset_path: "./bin/linux/x64/Simple Reader-${{ steps.package-version.outputs.current-version }}.AppImage"
+                  asset_name: Simple.Reader.${{ steps.package-version.outputs.current-version }}.linux-x64.AppImage
+                  asset_content_type: application/octet-stream

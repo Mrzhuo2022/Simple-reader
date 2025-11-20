@@ -7,6 +7,7 @@ import { toggleGroupExpansion } from "../scripts/models/group"
 import { SourceGroup } from "../schema-types"
 import {
     selectAllArticles,
+    selectStarred,
     selectSources,
     toggleSearch,
 } from "../scripts/models/page"
@@ -37,7 +38,12 @@ const mapStateToProps = createSelector(
 const mapDispatchToProps = dispatch => ({
     toggleMenu: () => dispatch(toggleMenu()),
     allArticles: (init = false) => {
-        dispatch(selectAllArticles(init)), dispatch(initFeeds())
+        dispatch(selectAllArticles(init))
+        dispatch(initFeeds())
+    },
+    selectStarred: () => {
+        dispatch(selectStarred(true))
+        dispatch(initFeeds())
     },
     selectSourceGroup: (group: SourceGroup, menuKey: string) => {
         dispatch(selectSources(group.sids, menuKey, group.name))
@@ -50,13 +56,9 @@ const mapDispatchToProps = dispatch => ({
     groupContextMenu: (sids: number[], event: React.MouseEvent) => {
         dispatch(openGroupMenu(sids, event))
     },
-    updateGroupExpansion: (
-        event: React.MouseEvent<HTMLElement>,
-        key: string,
-        selected: string
-    ) => {
+    updateGroupExpansion: (event: React.MouseEvent<HTMLElement>, key: string, selected: string) => {
         if ((event.target as HTMLElement).tagName === "I" || key === selected) {
-            let [type, index] = key.split("-")
+            const [type, index] = key.split("-")
             if (type === "g") dispatch(toggleGroupExpansion(parseInt(index)))
         }
     },

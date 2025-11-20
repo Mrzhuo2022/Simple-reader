@@ -1,9 +1,35 @@
 node_modules
+
+# Electron build outputs (Webpack)
 dist/*.js
 dist/*.js.map
 dist/*.html
 dist/*.LICENSE.txt
-bin/*
+
+# Electron-builder / installer outputs
+bin/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS / filesystem junk
 .DS_Store
-*.provisionprofile
+Thumbs.db
+
+# Package manager lock files
 *.lock
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Provisioning profiles
+*.provisionprofile

@@ -2,7 +2,7 @@ import * as React from "react"
 import intl from "react-intl-universal"
 import { FeedProps } from "./feed"
 import DefaultCard from "../cards/default-card"
-import { PrimaryButton, FocusZone } from "office-ui-fabric-react"
+import { PrimaryButton, FocusZone } from "@fluentui/react"
 import { RSSItem } from "../../scripts/models/item"
 import { List, AnimationClassNames } from "@fluentui/react"
 
@@ -31,8 +31,8 @@ class CardsFeed extends React.Component<FeedProps> {
     }
 
     getItemCountForPage = () => {
-        let elemPerRow = Math.floor(this.state.width / 280)
-        let rows = Math.ceil(this.state.height / 304)
+        const elemPerRow = Math.floor(this.state.width / 280)
+        const rows = Math.ceil(this.state.height / 304)
         return elemPerRow * rows
     }
     getPageHeight = () => {
@@ -40,9 +40,9 @@ class CardsFeed extends React.Component<FeedProps> {
     }
 
     flexFixItems = () => {
-        let elemPerRow = Math.floor(this.state.width / 280)
-        let elemLastRow = this.props.items.length % elemPerRow
-        let items = [...this.props.items]
+        const elemPerRow = Math.floor(this.state.width / 280)
+        const elemLastRow = this.props.items.length % elemPerRow
+        const items = [...this.props.items]
         for (let i = 0; i < elemPerRow - elemLastRow; i += 1) items.push(null)
         return items
     }
@@ -66,9 +66,7 @@ class CardsFeed extends React.Component<FeedProps> {
     canFocusChild = (el: HTMLElement) => {
         if (el.id === "load-more") {
             const container = document.getElementById("refocus")
-            const result =
-                container.scrollTop >
-                container.scrollHeight - 2 * container.offsetHeight
+            const result = container.scrollTop > container.scrollHeight - 2 * container.offsetHeight
             if (!result) container.scrollTop += 100
             return result
         } else {
@@ -84,7 +82,8 @@ class CardsFeed extends React.Component<FeedProps> {
                     id="refocus"
                     className="cards-feed-container"
                     shouldReceiveFocus={this.canFocusChild}
-                    data-is-scrollable>
+                    data-is-scrollable
+                >
                     <List
                         className={AnimationClassNames.slideUpIn10}
                         items={this.flexFixItems()}
@@ -100,14 +99,12 @@ class CardsFeed extends React.Component<FeedProps> {
                                 id="load-more"
                                 text={intl.get("loadMore")}
                                 disabled={this.props.feed.loading}
-                                onClick={() =>
-                                    this.props.loadMore(this.props.feed)
-                                }
+                                onClick={() => this.props.loadMore(this.props.feed)}
                             />
                         </div>
                     ) : null}
                     {this.props.items.length === 0 && (
-                        <div className="empty">{intl.get("article.empty")}</div>
+                        <div className="empty">{intl.get("nav.empty")}</div>
                     )}
                 </FocusZone>
             )

@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 import Store = require("electron-store")
 import {
     SchemaTypes,
@@ -8,6 +9,8 @@ import {
     SyncService,
     ServiceConfigs,
     ViewConfigs,
+    AIConfigs,
+    Shortcuts,
 } from "../schema-types"
 import { ipcMain, session, nativeTheme, app } from "electron"
 import { WindowManager } from "./window"
@@ -49,7 +52,7 @@ function setProxy(address = null) {
         store.set(PAC_STORE_KEY, address)
     }
     if (getProxyStatus()) {
-        let rules = { pacScript: address }
+        const rules = { pacScript: address }
         session.defaultSession.setProxy(rules)
         session.fromPartition("sandbox").setProxy(rules)
     }
@@ -63,7 +66,7 @@ ipcMain.on("toggle-proxy-status", () => {
 ipcMain.on("get-proxy", event => {
     event.returnValue = getProxy()
 })
-ipcMain.handle("set-proxy", (_, address = null) => {
+ipcMain.handle("set-proxy", (_, address?: string | null) => {
     setProxy(address)
 })
 
@@ -90,7 +93,7 @@ export function setThemeListener(manager: WindowManager) {
     nativeTheme.removeAllListeners()
     nativeTheme.on("updated", () => {
         if (manager.hasWindow()) {
-            let contents = manager.mainWindow.webContents
+            const contents = manager.mainWindow.webContents
             if (!contents.isDestroyed()) {
                 contents.send("theme-updated", nativeTheme.shouldUseDarkColors)
             }
@@ -109,8 +112,8 @@ ipcMain.on("get-locale-settings", event => {
     event.returnValue = getLocaleSettings()
 })
 ipcMain.on("get-locale", event => {
-    let setting = getLocaleSettings()
-    let locale = setting === "default" ? app.getLocale() : setting
+    const setting = getLocaleSettings()
+    const locale = setting === "default" ? app.getLocale() : setting
     event.returnValue = locale
 })
 
@@ -131,8 +134,8 @@ ipcMain.handle("set-font", (_, font: string) => {
 })
 
 ipcMain.on("get-all-settings", event => {
-    let output = {}
-    for (let [key, value] of store) {
+    const output: Record<string, unknown> = {}
+    for (const [key, value] of store) {
         output[key] = value
     }
     event.returnValue = output
@@ -176,26 +179,20 @@ const LIST_CONFIGS_STORE_KEY = "listViewConfigs"
 ipcMain.on("get-view-configs", (event, view: ViewType) => {
     switch (view) {
         case ViewType.List:
-            event.returnValue = store.get(
-                LIST_CONFIGS_STORE_KEY,
-                ViewConfigs.ShowCover
-            )
+            event.returnValue = store.get(LIST_CONFIGS_STORE_KEY, ViewConfigs.ShowCover)
             break
         default:
             event.returnValue = undefined
             break
     }
 })
-ipcMain.handle(
-    "set-view-configs",
-    (_, view: ViewType, configs: ViewConfigs) => {
-        switch (view) {
-            case ViewType.List:
-                store.set(LIST_CONFIGS_STORE_KEY, configs)
-                break
-        }
+ipcMain.handle("set-view-configs", (_, view: ViewType, configs: ViewConfigs) => {
+    switch (view) {
+        case ViewType.List:
+            store.set(LIST_CONFIGS_STORE_KEY, configs)
+            break
     }
-)
+})
 
 const NEDB_STATUS_STORE_KEY = "useNeDB"
 ipcMain.on("get-nedb-status", event => {
@@ -203,4 +200,101 @@ ipcMain.on("get-nedb-status", event => {
 })
 ipcMain.handle("set-nedb-status", (_, flag: boolean) => {
     store.set(NEDB_STATUS_STORE_KEY, flag)
+})
+
+// 全局快捷键配置
+const SHORTCUTS_STORE_KEY = "shortcuts"
+const DEFAULT_SHORTCUTS: Shortcuts = {
+    aiSummary: "Alt+S",
+    aiTranslation: "Alt+T",
+    markRead: "M",
+    star: "S",
+    openExternal: "B",
+    hide: "H",
+    toggleWebpage: "L",
+    toggleFull: "W",
+    navToggleMenu: "F1",
+    navSearch: "F2",
+    navRefresh: "F5",
+    navMarkAllRead: "F6",
+    navLogs: "F7",
+    navViews: "F8",
+    navSettings: "F9",
+    prevItem: "ArrowLeft",
+    nextItem: "ArrowRight",
+    articleClose: "Escape",
+    articleToggleWeb: "L",
+    articleToggleFull: "W",
+}
+ipcMain.on("get-shortcuts", event => {
+    const saved = store.get(SHORTCUTS_STORE_KEY, DEFAULT_SHORTCUTS) as Partial<Shortcuts>
+    event.returnValue = { ...DEFAULT_SHORTCUTS, ...(saved || {}) }
+})
+ipcMain.handle("set-shortcuts", (_, shortcuts: Shortcuts) => {
+    store.set(SHORTCUTS_STORE_KEY, shortcuts)
+})
+
+const AI_CONFIGS_STORE_KEY = "aiConfigs"
+const DEFAULT_AI_CONFIGS: AIConfigs = {
+    enabled: false,
+    baseUrl: "https://api.openai.com/v1",
+    apiKey: "",
+    defaultModel: "gpt-4o-mini",
+    availableModels: [] as string[],
+    autoSummary: false,
+    autoTranslateImmersive: false,
+    translateTarget: "zh",
+    translateWhen: "auto",
+    concurrency: 5,
+    maxTextLengthPerRequest: 1500,
+    maxParagraphsPerRequest: 1,
+}
+ipcMain.on("get-ai-configs", event => {
+    const saved = store.get(AI_CONFIGS_STORE_KEY, DEFAULT_AI_CONFIGS) as Partial<AIConfigs>
+    // 合并默认值，兼容历史存储缺失字段
+    event.returnValue = { ...DEFAULT_AI_CONFIGS, ...(saved || {}) }
+})
+ipcMain.handle("set-ai-configs", (_, configs: AIConfigs) => {
+    store.set(AI_CONFIGS_STORE_KEY, configs)
+})
+
+// AI Cache IPC handlers
+import * as aiCache from "../scripts/models/services/aiCache"
+
+// Initialize AI cache database when app is ready
+let cacheInitialized = false
+const ensureCacheInit = (): void => {
+    if (!cacheInitialized && app.isReady()) {
+        aiCache.initDB(app.getPath("userData"))
+        cacheInitialized = true
+    }
+}
+
+ipcMain.handle("ai-cache-get", (_, itemId: string) => {
+    ensureCacheInit()
+    return aiCache.getCache(itemId)
+})
+
+ipcMain.handle("ai-cache-save-summary", (_, itemId: string, summary: string) => {
+    ensureCacheInit()
+    aiCache.saveSummary(itemId, summary)
+})
+
+ipcMain.handle("ai-cache-save-translation", (_, itemId: string, translation: string) => {
+    ensureCacheInit()
+    aiCache.saveTranslation(itemId, translation)
+})
+
+ipcMain.handle("ai-cache-save-title-translation", (_, itemId: string, titleTranslation: string) => {
+    ensureCacheInit()
+    aiCache.saveTitleTranslation(itemId, titleTranslation)
+})
+
+ipcMain.handle("ai-cache-clear-old", (_, daysToKeep: number) => {
+    ensureCacheInit()
+    aiCache.clearOldCache(daysToKeep)
+})
+
+app.on("before-quit", () => {
+    aiCache.closeDB()
 })

@@ -1,17 +1,8 @@
 import * as React from "react"
 import intl from "react-intl-universal"
-import {
-    urlTest,
-    byteToMB,
-    calculateItemSize,
-    getSearchEngineName,
-} from "../../scripts/utils"
-import { ThemeSettings, SearchEngines } from "../../schema-types"
-import {
-    getThemeSettings,
-    setThemeSettings,
-    exportAll,
-} from "../../scripts/settings"
+import { urlTest, byteToMB, calculateItemSize, getSearchEngineName } from "../../scripts/utils"
+import { ThemeSettings, SearchEngines, ViewType } from "../../schema-types"
+import { getThemeSettings, setThemeSettings, exportAll } from "../../scripts/settings"
 import {
     Stack,
     Label,
@@ -107,6 +98,16 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
         window.settings.setSearchEngine(item.key as number)
     }
 
+    defaultViewOptions = (): IDropdownOption[] => [
+        { key: ViewType.Cards, text: intl.get("context.cardView") },
+        { key: ViewType.List, text: intl.get("context.listView") },
+        { key: ViewType.Magazine, text: intl.get("context.magazineView") },
+        { key: ViewType.Compact, text: intl.get("context.compactView") },
+    ]
+    onDefaultViewChanged = (item: IDropdownOption) => {
+        window.settings.setDefaultView(item.key as ViewType)
+    }
+
     deleteOptions = (): IDropdownOption[] => [
         { key: "7", text: intl.get("app.daysAgo", { days: 7 }) },
         { key: "14", text: intl.get("app.daysAgo", { days: 14 }) },
@@ -121,9 +122,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
 
     confirmDelete = () => {
         this.setState({ itemSize: null })
-        this.props
-            .deleteArticles(parseInt(this.state.deleteIndex))
-            .then(() => this.getItemSize())
+        this.props.deleteArticles(parseInt(this.state.deleteIndex)).then(() => this.getItemSize())
     }
 
     languageOptions = (): IDropdownOption[] => [
@@ -156,16 +155,13 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
         })
     }
 
-    handleInputChange = event => {
-        const name: string = event.target.name
-        // @ts-ignore
-        this.setState({ [name]: event.target.value.trim() })
+    handleInputChange = (event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        this.setState({ pacUrl: event.currentTarget.value.trim() })
     }
 
     setUrl = (event: React.FormEvent) => {
         event.preventDefault()
-        if (urlTest(this.state.pacUrl))
-            window.settings.setProxy(this.state.pacUrl)
+        if (urlTest(this.state.pacUrl)) window.settings.setProxy(this.state.pacUrl)
     }
 
     onThemeChange = (_, option: IChoiceGroupOption) => {
@@ -181,9 +177,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                     <Dropdown
                         defaultSelectedKey={window.settings.getLocaleSettings()}
                         options={this.languageOptions()}
-                        onChanged={option =>
-                            this.props.setLanguage(String(option.key))
-                        }
+                        onChanged={option => this.props.setLanguage(String(option.key))}
                         style={{ width: 200 }}
                     />
                 </Stack.Item>
@@ -208,6 +202,18 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                 </Stack.Item>
             </Stack>
 
+            <Label>{intl.get("app.defaultView")}</Label>
+            <Stack horizontal>
+                <Stack.Item>
+                    <Dropdown
+                        defaultSelectedKey={window.settings.getDefaultView()}
+                        options={this.defaultViewOptions()}
+                        onChanged={this.onDefaultViewChanged}
+                        style={{ width: 200 }}
+                    />
+                </Stack.Item>
+            </Stack>
+
             <Label>{intl.get("searchEngine.name")}</Label>
             <Stack horizontal>
                 <Stack.Item>
@@ -225,10 +231,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                     <Label>{intl.get("app.enableProxy")}</Label>
                 </Stack.Item>
                 <Stack.Item>
-                    <Toggle
-                        checked={this.state.pacStatus}
-                        onChange={this.toggleStatus}
-                    />
+                    <Toggle checked={this.state.pacStatus} onChange={this.toggleStatus} />
                 </Stack.Item>
             </Stack>
             {this.state.pacStatus && (
@@ -238,9 +241,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                             <TextField
                                 required
                                 onGetErrorMessage={v =>
-                                    urlTest(v.trim())
-                                        ? ""
-                                        : intl.get("app.badUrl")
+                                    urlTest(v.trim()) ? "" : intl.get("app.badUrl")
                                 }
                                 placeholder={intl.get("app.pac")}
                                 name="pacUrl"
@@ -256,9 +257,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                             />
                         </Stack.Item>
                     </Stack>
-                    <span className="settings-hint up">
-                        {intl.get("app.pacHint")}
-                    </span>
+                    <span className="settings-hint up">{intl.get("app.pacHint")}</span>
                 </form>
             )}
 
@@ -274,10 +273,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                 </Stack.Item>
                 <Stack.Item>
                     <DangerButton
-                        disabled={
-                            this.state.itemSize === null ||
-                            this.state.deleteIndex === null
-                        }
+                        disabled={this.state.itemSize === null || this.state.deleteIndex === null}
                         text={intl.get("app.confirmDelete")}
                         onClick={this.confirmDelete}
                     />
@@ -292,10 +288,7 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                 <Stack.Item>
                     <DefaultButton
                         text={intl.get("app.cache")}
-                        disabled={
-                            this.state.cacheSize === null ||
-                            this.state.cacheSize === "0MB"
-                        }
+                        disabled={this.state.cacheSize === null || this.state.cacheSize === "0MB"}
                         onClick={this.clearCache}
                     />
                 </Stack.Item>
@@ -309,16 +302,10 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
             <Label>{intl.get("app.data")}</Label>
             <Stack horizontal>
                 <Stack.Item>
-                    <PrimaryButton
-                        onClick={exportAll}
-                        text={intl.get("app.backup")}
-                    />
+                    <PrimaryButton onClick={exportAll} text={intl.get("app.backup")} />
                 </Stack.Item>
                 <Stack.Item>
-                    <DefaultButton
-                        onClick={this.props.importAll}
-                        text={intl.get("app.restore")}
-                    />
+                    <DefaultButton onClick={this.props.importAll} text={intl.get("app.restore")} />
                 </Stack.Item>
             </Stack>
         </div>

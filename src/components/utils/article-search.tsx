@@ -23,7 +23,7 @@ class ArticleSearch extends React.Component<SearchProps, SearchState> {
     constructor(props: SearchProps) {
         super(props)
         this.debouncedSearch = new Async().debounce((query: string) => {
-            let regex = validateRegex(query)
+            const regex = validateRegex(query)
             if (regex !== null) props.dispatch(performSearch(query))
         }, 750)
         this.inputRef = React.createRef<ISearchBox>()

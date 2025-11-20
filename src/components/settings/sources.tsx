@@ -22,33 +22,43 @@ import {
     SourceState,
     RSSSource,
     SourceOpenTarget,
+    AddSourceOptions,
 } from "../../scripts/models/source"
+import { SourceGroup } from "../../schema-types"
 import { urlTest } from "../../scripts/utils"
 import DangerButton from "../utils/danger-button"
+import SourceIcon from "../utils/source-icon"
 
 type SourcesTabProps = {
     sources: SourceState
     serviceOn: boolean
     sids: number[]
+    groups: SourceGroup[]
     acknowledgeSIDs: () => void
-    addSource: (url: string) => void
+    addSource: (url: string, name?: string, options?: AddSourceOptions) => void
     updateSourceName: (source: RSSSource, name: string) => void
     updateSourceIcon: (source: RSSSource, iconUrl: string) => Promise<void>
-    updateSourceOpenTarget: (
-        source: RSSSource,
-        target: SourceOpenTarget
-    ) => void
+    updateSourceOpenTarget: (source: RSSSource, target: SourceOpenTarget) => void
     updateFetchFrequency: (source: RSSSource, frequency: number) => void
     deleteSource: (source: RSSSource) => void
     deleteSources: (sources: RSSSource[]) => void
     importOPML: () => void
     exportOPML: () => void
     toggleSourceHidden: (source: RSSSource) => void
+    addToGroup: (groupIndex: number, sid: number) => void
+    removeFromGroup: (groupIndex: number, sids: number[]) => void
 }
 
-type SourcesTabState = {
-    [formName: string]: string
-} & {
+interface SourcesTabState {
+    newUrl: string
+    newSourceAddName: string
+    newSourceName: string
+    newSourceGroupKey: string
+    newSourceFetchFrequency: string
+    newSourceOpenTarget: string
+    newSourceIcon: string
+    sourceEditOption: string
+    showNewSourceOptions: boolean
     selectedSource: RSSSource
     selectedSources: RSSSource[]
 }
@@ -66,17 +76,22 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         super(props)
         this.state = {
             newUrl: "",
+            newSourceAddName: "",
             newSourceName: "",
+            newSourceGroupKey: "none",
+            newSourceFetchFrequency: "0",
+            newSourceOpenTarget: String(SourceOpenTarget.Local),
+            newSourceIcon: "",
+            sourceEditOption: EditDropdownKeys.Name,
+            showNewSourceOptions: false,
             selectedSource: null,
             selectedSources: null,
         }
         this.selection = new Selection({
             getKey: s => (s as RSSSource).sid,
             onSelectionChanged: () => {
-                let count = this.selection.getSelectedCount()
-                let sources = count
-                    ? (this.selection.getSelection() as RSSSource[])
-                    : null
+                const count = this.selection.getSelectedCount()
+                const sources = count ? (this.selection.getSelection() as RSSSource[]) : null
                 this.setState({
                     selectedSource: count === 1 ? sources[0] : null,
                     selectedSources: count > 1 ? sources : null,
@@ -90,7 +105,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
 
     componentDidMount = () => {
         if (this.props.sids.length > 0) {
-            for (let sid of this.props.sids) {
+            for (const sid of this.props.sids) {
                 this.selection.setKeySelected(String(sid), true, false)
             }
             this.props.acknowledgeSIDs()
@@ -106,8 +121,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
             iconName: "ImagePixel",
             minWidth: 16,
             maxWidth: 16,
-            onRender: (s: RSSSource) =>
-                s.iconurl && <img src={s.iconurl} className="favicon" />,
+            onRender: (s: RSSSource) => <SourceIcon url={s.iconurl} />,
         },
         {
             key: "name",
@@ -149,7 +163,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
     ]
 
     onFetchFrequencyChange = (_, option: IDropdownOption) => {
-        let frequency = parseInt(option.key as string)
+        const frequency = parseInt(option.key as string)
         this.props.updateFetchFrequency(this.state.selectedSource, frequency)
         this.setState({
             selectedSource: {
@@ -159,6 +173,10 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         })
     }
 
+    onNewSourceFetchFrequencyChange = (_, option: IDropdownOption) => {
+        this.setState({ newSourceFetchFrequency: option.key as string })
+    }
+
     sourceOpenTargetChoices = (): IChoiceGroupOption[] => [
         {
             key: String(SourceOpenTarget.Local),
@@ -166,7 +184,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         },
         {
             key: String(SourceOpenTarget.FullContent),
-            text: intl.get("article.loadFull"),
+            text: intl.get("nav.loadFull"),
         },
         {
             key: String(SourceOpenTarget.Webpage),
@@ -179,7 +197,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
     ]
 
     updateSourceName = () => {
-        let newName = this.state.newSourceName.trim()
+        const newName = this.state.newSourceName.trim()
         this.props.updateSourceName(this.state.selectedSource, newName)
         this.setState({
             selectedSource: {
@@ -190,26 +208,93 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
     }
 
     updateSourceIcon = () => {
-        let newIcon = this.state.newSourceIcon.trim()
+        const newIcon = this.state.newSourceIcon.trim()
         this.props.updateSourceIcon(this.state.selectedSource, newIcon)
         this.setState({
             selectedSource: { ...this.state.selectedSource, iconurl: newIcon },
         })
     }
 
-    handleInputChange = event => {
-        const name: string = event.target.name
-        this.setState({ [name]: event.target.value })
+    handleInputChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const { name, value } = event.target
+        switch (name) {
+            case "newUrl":
+                this.setState({ newUrl: value })
+                break
+            case "newSourceAddName":
+                this.setState({ newSourceAddName: value })
+                break
+            case "newSourceName":
+                this.setState({ newSourceName: value })
+                break
+            case "newSourceIcon":
+                this.setState({ newSourceIcon: value })
+                break
+        }
     }
 
     addSource = (event: React.FormEvent) => {
         event.preventDefault()
-        let trimmed = this.state.newUrl.trim()
-        if (urlTest(trimmed)) this.props.addSource(trimmed)
+        const trimmed = this.state.newUrl.trim()
+        if (!urlTest(trimmed)) return
+
+        if (!this.state.showNewSourceOptions) {
+            this.setState({ showNewSourceOptions: true })
+            if (!this.state.newSourceAddName || this.state.newSourceAddName.trim().length === 0) {
+                const tempSource = new RSSSource(trimmed)
+                RSSSource.fetchMetaData(tempSource)
+                    .then(() => {
+                        if (
+                            this.state.showNewSourceOptions &&
+                            (!this.state.newSourceAddName ||
+                                this.state.newSourceAddName.trim().length === 0)
+                        ) {
+                            this.setState({
+                                newSourceAddName: tempSource.name,
+                            })
+                        }
+                    })
+                    .catch(() => {})
+            }
+            return
+        }
+        const options: AddSourceOptions = {}
+        if (this.state.newSourceGroupKey && this.state.newSourceGroupKey !== "none") {
+            const groupIndex = Number(this.state.newSourceGroupKey)
+            if (!Number.isNaN(groupIndex) && groupIndex >= 0) {
+                options.groupIndex = groupIndex
+            }
+        }
+        if (this.state.newSourceFetchFrequency) {
+            const frequency = parseInt(this.state.newSourceFetchFrequency, 10)
+            if (!Number.isNaN(frequency)) {
+                options.fetchFrequency = frequency
+            }
+        }
+        if (this.state.newSourceOpenTarget) {
+            const openTarget = parseInt(this.state.newSourceOpenTarget, 10)
+            if (!Number.isNaN(openTarget)) {
+                options.openTarget = openTarget as SourceOpenTarget
+            }
+        }
+        const name = this.state.newSourceAddName.trim()
+        this.props.addSource(
+            trimmed,
+            name.length > 0 ? name : undefined,
+            Object.keys(options).length > 0 ? options : undefined
+        )
+        this.setState({
+            newUrl: "",
+            newSourceAddName: "",
+            newSourceGroupKey: "none",
+            newSourceFetchFrequency: "0",
+            newSourceOpenTarget: String(SourceOpenTarget.Local),
+            showNewSourceOptions: false,
+        })
     }
 
     onOpenTargetChange = (_, option: IChoiceGroupOption) => {
-        let newTarget = parseInt(option.key) as SourceOpenTarget
+        const newTarget = parseInt(option.key) as SourceOpenTarget
         this.props.updateSourceOpenTarget(this.state.selectedSource, newTarget)
         this.setState({
             selectedSource: {
@@ -217,6 +302,55 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                 openTarget: newTarget,
             } as RSSSource,
         })
+    }
+
+    onNewSourceOpenTargetChange = (_, option: IChoiceGroupOption) => {
+        this.setState({ newSourceOpenTarget: option.key })
+    }
+
+    private getSourceGroupIndex = (source: RSSSource): number => {
+        if (!source || !this.props.groups) return null
+        const group = this.props.groups.find(
+            g => g.isMultiple && g.sids && g.sids.includes(source.sid)
+        )
+        return group ? group.index : null
+    }
+
+    private groupDropdownOptions = (): IDropdownOption[] => {
+        const options: IDropdownOption[] = [
+            {
+                key: "none",
+                text: intl.get("sources.groupNone"),
+            },
+        ]
+        this.props.groups
+            .filter(g => g.isMultiple)
+            .forEach(g => {
+                options.push({
+                    key: g.index,
+                    text: g.name,
+                })
+            })
+        return options
+    }
+
+    onNewSourceGroupChange = (_, option: IDropdownOption) => {
+        this.setState({ newSourceGroupKey: option.key as string })
+    }
+
+    onGroupChange = (_, option: IDropdownOption) => {
+        const source = this.state.selectedSource
+        if (!source) return
+        const currentIndex = this.getSourceGroupIndex(source)
+        if (option.key === "none") {
+            if (currentIndex !== null) {
+                this.props.removeFromGroup(currentIndex, [source.sid])
+            }
+            return
+        }
+        const targetIndex = Number(option.key)
+        if (currentIndex !== null && targetIndex === currentIndex) return
+        this.props.addToGroup(targetIndex, source.sid)
     }
 
     onToggleHidden = () => {
@@ -253,14 +387,16 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
             </Stack>
 
             <form onSubmit={this.addSource}>
-                <Label htmlFor="newUrl">{intl.get("sources.add")}</Label>
+                <Label htmlFor="newUrl">
+                    {this.state.showNewSourceOptions
+                        ? intl.get("sources.addStep2")
+                        : intl.get("sources.add")}
+                </Label>
                 <Stack horizontal>
                     <Stack.Item grow>
                         <TextField
                             onGetErrorMessage={v =>
-                                urlTest(v.trim())
-                                    ? ""
-                                    : intl.get("sources.badUrl")
+                                urlTest(v.trim()) ? "" : intl.get("sources.badUrl")
                             }
                             validateOnLoad={false}
                             placeholder={intl.get("sources.inputUrl")}
@@ -274,10 +410,58 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                         <PrimaryButton
                             disabled={!urlTest(this.state.newUrl.trim())}
                             type="submit"
-                            text={intl.get("add")}
+                            text={
+                                this.state.showNewSourceOptions
+                                    ? intl.get("confirm")
+                                    : intl.get("add")
+                            }
                         />
                     </Stack.Item>
                 </Stack>
+                {this.state.showNewSourceOptions && (
+                    <>
+                        <Stack styles={{ root: { marginTop: 8 } }}>
+                            <Stack.Item grow>
+                                <TextField
+                                    label={intl.get("sources.name")}
+                                    value={this.state.newSourceAddName}
+                                    name="newSourceAddName"
+                                    onChange={this.handleInputChange}
+                                />
+                            </Stack.Item>
+                        </Stack>
+                        <Stack
+                            horizontal
+                            tokens={{ childrenGap: 16 }}
+                            styles={{ root: { marginTop: 8 } }}
+                        >
+                            <Stack.Item grow>
+                                <Dropdown
+                                    label={intl.get("sources.group")}
+                                    options={this.groupDropdownOptions()}
+                                    selectedKey={this.state.newSourceGroupKey ?? "none"}
+                                    onChange={this.onNewSourceGroupChange}
+                                />
+                            </Stack.Item>
+                            <Stack.Item grow>
+                                <Dropdown
+                                    label={intl.get("sources.fetchFrequency")}
+                                    options={this.fetchFrequencyOptions()}
+                                    selectedKey={this.state.newSourceFetchFrequency ?? "0"}
+                                    onChange={this.onNewSourceFetchFrequencyChange}
+                                />
+                            </Stack.Item>
+                        </Stack>
+                        <ChoiceGroup
+                            label={intl.get("sources.openTarget")}
+                            options={this.sourceOpenTargetChoices()}
+                            selectedKey={
+                                this.state.newSourceOpenTarget ?? String(SourceOpenTarget.Local)
+                            }
+                            onChange={this.onNewSourceOpenTargetChange}
+                        />
+                    </>
+                )}
             </form>
 
             <DetailsList
@@ -307,15 +491,12 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                                 style={{ width: 120 }}
                             />
                         </Stack.Item>
-                        {this.state.sourceEditOption ===
-                            EditDropdownKeys.Name && (
+                        {this.state.sourceEditOption === EditDropdownKeys.Name && (
                             <>
                                 <Stack.Item grow>
                                     <TextField
                                         onGetErrorMessage={v =>
-                                            v.trim().length == 0
-                                                ? intl.get("emptyName")
-                                                : ""
+                                            v.trim().length == 0 ? intl.get("emptyName") : ""
                                         }
                                         validateOnLoad={false}
                                         placeholder={intl.get("sources.name")}
@@ -326,30 +507,22 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                                 </Stack.Item>
                                 <Stack.Item>
                                     <DefaultButton
-                                        disabled={
-                                            this.state.newSourceName.trim()
-                                                .length == 0
-                                        }
+                                        disabled={this.state.newSourceName.trim().length == 0}
                                         onClick={this.updateSourceName}
                                         text={intl.get("sources.editName")}
                                     />
                                 </Stack.Item>
                             </>
                         )}
-                        {this.state.sourceEditOption ===
-                            EditDropdownKeys.Icon && (
+                        {this.state.sourceEditOption === EditDropdownKeys.Icon && (
                             <>
                                 <Stack.Item grow>
                                     <TextField
                                         onGetErrorMessage={v =>
-                                            urlTest(v.trim())
-                                                ? ""
-                                                : intl.get("sources.badUrl")
+                                            urlTest(v.trim()) ? "" : intl.get("sources.badUrl")
                                         }
                                         validateOnLoad={false}
-                                        placeholder={intl.get(
-                                            "sources.inputUrl"
-                                        )}
+                                        placeholder={intl.get("sources.inputUrl")}
                                         value={this.state.newSourceIcon}
                                         name="newSourceIcon"
                                         onChange={this.handleInputChange}
@@ -357,25 +530,17 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                                 </Stack.Item>
                                 <Stack.Item>
                                     <DefaultButton
-                                        disabled={
-                                            !urlTest(
-                                                this.state.newSourceIcon.trim()
-                                            )
-                                        }
+                                        disabled={!urlTest(this.state.newSourceIcon.trim())}
                                         onClick={this.updateSourceIcon}
                                         text={intl.get("edit")}
                                     />
                                 </Stack.Item>
                             </>
                         )}
-                        {this.state.sourceEditOption ===
-                            EditDropdownKeys.Url && (
+                        {this.state.sourceEditOption === EditDropdownKeys.Url && (
                             <>
                                 <Stack.Item grow>
-                                    <TextField
-                                        disabled
-                                        value={this.state.selectedSource.url}
-                                    />
+                                    <TextField disabled value={this.state.selectedSource.url} />
                                 </Stack.Item>
                                 <Stack.Item>
                                     <DefaultButton
@@ -398,12 +563,8 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                                     <Dropdown
                                         options={this.fetchFrequencyOptions()}
                                         selectedKey={
-                                            this.state.selectedSource
-                                                .fetchFrequency
-                                                ? String(
-                                                      this.state.selectedSource
-                                                          .fetchFrequency
-                                                  )
+                                            this.state.selectedSource.fetchFrequency
+                                                ? String(this.state.selectedSource.fetchFrequency)
                                                 : "0"
                                         }
                                         onChange={this.onFetchFrequencyChange}
@@ -416,9 +577,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                     <ChoiceGroup
                         label={intl.get("sources.openTarget")}
                         options={this.sourceOpenTargetChoices()}
-                        selectedKey={String(
-                            this.state.selectedSource.openTarget
-                        )}
+                        selectedKey={String(this.state.selectedSource.openTarget)}
                         onChange={this.onOpenTargetChange}
                     />
                     <Stack horizontal verticalAlign="baseline">
@@ -432,14 +591,24 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                             />
                         </Stack.Item>
                     </Stack>
+                    <Label>{intl.get("sources.group")}</Label>
+                    <Stack horizontal>
+                        <Stack.Item grow>
+                            <Dropdown
+                                options={this.groupDropdownOptions()}
+                                selectedKey={
+                                    this.getSourceGroupIndex(this.state.selectedSource) ?? "none"
+                                }
+                                onChange={this.onGroupChange}
+                            />
+                        </Stack.Item>
+                    </Stack>
                     {!this.state.selectedSource.serviceRef && (
                         <Stack horizontal>
                             <Stack.Item>
                                 <DangerButton
                                     onClick={() =>
-                                        this.props.deleteSource(
-                                            this.state.selectedSource
-                                        )
+                                        this.props.deleteSource(this.state.selectedSource)
                                     }
                                     key={this.state.selectedSource.sid}
                                     text={intl.get("sources.delete")}
@@ -455,17 +624,14 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                 </>
             )}
             {this.state.selectedSources &&
-                (this.state.selectedSources.filter(s => s.serviceRef).length ===
-                0 ? (
+                (this.state.selectedSources.filter(s => s.serviceRef).length === 0 ? (
                     <>
                         <Label>{intl.get("sources.selectedMulti")}</Label>
                         <Stack horizontal>
                             <Stack.Item>
                                 <DangerButton
                                     onClick={() =>
-                                        this.props.deleteSources(
-                                            this.state.selectedSources
-                                        )
+                                        this.props.deleteSources(this.state.selectedSources)
                                     }
                                     text={intl.get("sources.delete")}
                                 />

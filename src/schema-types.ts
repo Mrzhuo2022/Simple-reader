@@ -81,6 +81,50 @@ export interface TouchBarTexts {
     notifications: string
 }
 
+export interface AIConfigs {
+    enabled: boolean
+    baseUrl: string
+    apiKey: string
+    defaultModel: string
+    availableModels: string[]
+    autoSummary?: boolean
+    autoTranslateImmersive?: boolean
+    translateTarget?: "zh" | "en"
+    translateWhen?: "auto" | "nonTargetOnly" | "always" | "zhOnly" | "nonZhOnly"
+    concurrency?: number
+    maxTextLengthPerRequest?: number
+    maxParagraphsPerRequest?: number
+    prompts?: {
+        summary?: string
+        translation?: string
+    }
+}
+
+export interface Shortcuts {
+    aiSummary: string
+    aiTranslation: string
+    markRead: string
+    star: string
+    openExternal: string
+    hide: string
+    toggleWebpage: string
+    toggleFull: string
+    // 导航栏
+    navToggleMenu?: string
+    navSearch?: string
+    navRefresh?: string
+    navMarkAllRead?: string
+    navLogs?: string
+    navViews?: string
+    navSettings?: string
+    // 文章导航与视图控制
+    prevItem?: string
+    nextItem?: string
+    articleClose?: string
+    articleToggleWeb?: string
+    articleToggleFull?: string
+}
+
 export type SchemaTypes = {
     version: string
     theme: ThemeSettings
@@ -98,4 +142,6 @@ export type SchemaTypes = {
     filterType: number
     listViewConfigs: ViewConfigs
     useNeDB: boolean
+    aiConfigs: AIConfigs
+    shortcuts: Shortcuts
 }

@@ -21,8 +21,7 @@ a:active {
 }
 
 .elevate {
-    box-shadow: 0 6.4px 14.4px 0 rgba(0, 0, 0, 0.132),
-        0 1.2px 3.6px 0 rgba(0, 0, 0, 0.108);
+    box-shadow: 0 6.4px 14.4px 0 rgba(0, 0, 0, 0.132), 0 1.2px 3.6px 0 rgba(0, 0, 0, 0.108);
 }
 
 .logo-container {
@@ -30,13 +29,17 @@ a:active {
     width: 100%;
     min-height: 540px;
     position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f3f2f1 0%, #e1dfdd 100%);
 }
 .logo-container img {
     height: 180px;
     width: 180px;
-    position: fixed;
-    left: calc(50% - 90px);
-    top: calc(50% - 230px);
+    display: block;
+    margin: 0 auto;
 }
 .logo-container header {
     text-align: center;
@@ -44,9 +47,14 @@ a:active {
     width: 100%;
     font-size: 1.75em;
     font-weight: 500;
-    position: fixed;
-    left: 0;
-    top: calc(50% - 40px);
+    margin-top: 24px;
+    color: #323130;
+}
+.logo-container p {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 1.1em;
+    color: #605e5c;
 }
 
 .screenshot {
@@ -61,14 +69,15 @@ a:active {
 }
 
 .light-container {
-    padding-bottom: 48px;
+    padding: 72px 0 48px;
     background-color: #fff;
     position: relative;
 }
 .light-container .screenshot {
-    margin: 0 auto -280px;
+    margin: 0 auto -200px;
     position: relative;
-    top: -280px;
+    top: -200px;
+    z-index: 1;
 }
 .light-container h1,
 .dark-container h1 {
@@ -89,7 +98,7 @@ a:active {
 }
 
 .features-container {
-    padding: 48px 0;
+    padding: 240px 0 48px;
     margin: 0 auto;
     width: 95%;
     max-width: 950px;
@@ -102,13 +111,31 @@ a:active {
 .features-container > section {
     display: block;
     width: 45%;
-    height: 560px;
-    padding: 18px 36px;
+    min-height: 560px;
+    padding: 24px 36px;
     background-color: #fff;
     margin: 24px 0;
     overflow: hidden;
     position: relative;
     box-sizing: border-box;
+    border-radius: 8px;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.features-container > section:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.16), 0 2px 4px 0 rgba(0, 0, 0, 0.12);
+}
+.features-container > section > h2 {
+    font-size: 1.5em;
+    font-weight: 600;
+    margin: 0 0 16px;
+    color: #323130;
+}
+.features-container > section > p {
+    font-size: 1em;
+    line-height: 1.6;
+    color: #605e5c;
+    margin: 0 0 16px;
 }
 .features-container > section > h3 {
     font-weight: 500;
@@ -143,14 +170,39 @@ a:active {
 }
 
 .get-container {
-    height: 100vh;
+    min-height: 100vh;
     width: 100%;
-    min-height: 540px;
+    padding: 72px 0;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: center;
     flex-direction: column;
     position: relative;
+    background: linear-gradient(135deg, #f3f2f1 0%, #e1dfdd 100%);
+}
+.get-container > h2 {
+    font-size: 2em;
+    font-weight: 600;
+    margin: 0 0 32px;
+    color: #323130;
+}
+.get-container > div:first-of-type {
+    margin-bottom: 16px;
+}
+.get-container > div:first-of-type > a {
+    display: inline-block;
+    padding: 16px 32px;
+    background-color: #0078d4;
+    color: #fff;
+    border-radius: 4px;
+    font-size: 1.1em;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color 0.2s ease;
+}
+.get-container > div:first-of-type > a:hover {
+    background-color: #106ebe;
+    text-decoration: none;
 }
 .stores {
     display: flex;
@@ -173,11 +225,18 @@ a:active {
     display: flex;
     flex-direction: row;
     justify-content: center;
-    margin: calc(50vh - 210px) 0 48px;
+    margin: 32px 0 24px;
+    gap: 24px;
 }
 .links > a {
     display: inline-block;
-    margin: 0 8px;
+    padding: 8px 16px;
+    color: #0078d4;
+    font-size: 1em;
+    transition: color 0.2s ease;
+}
+.links > a:hover {
+    color: #106ebe;
 }
 
 @media (max-width: 780px) {
@@ -185,11 +244,16 @@ a:active {
     body {
         font-size: 14px;
     }
+    .logo-container {
+        min-height: 400px;
+        padding: 40px 20px;
+    }
     .logo-container img {
-        height: 140px;
-        width: 140px;
-        left: calc(50% - 70px);
-        top: calc(50% - 190px);
+        height: 120px;
+        width: 120px;
+    }
+    .logo-container header {
+        font-size: 1.5em;
     }
     .screenshot {
         margin-left: 5vw;
@@ -205,16 +269,19 @@ a:active {
     }
     .features-container > section {
         width: 95%;
-        height: auto;
-        padding-bottom: 80%;
+        min-height: auto;
+        padding: 20px 24px;
     }
-    .features-container > section:last-of-type {
-        padding-bottom: 36px;
+    .get-container {
+        min-height: auto;
+        padding: 48px 20px;
     }
-    .stores {
-        flex-direction: column;
+    .get-container > h2 {
+        font-size: 1.5em;
     }
     .links {
-        margin-top: calc(50vh - 270px);
+        flex-direction: column;
+        gap: 16px;
+        margin: 24px 0;
     }
 }

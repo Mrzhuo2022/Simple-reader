@@ -18,8 +18,7 @@ type LiteExporterProps = {
     serviceConfigs: ServiceConfigs
 }
 
-const LEARN_MORE_URL =
-    "https://github.com/yang991178/fluent-reader/wiki/Support#mobile-app"
+const LEARN_MORE_URL = "https://github.com/yang991178/fluent-reader/wiki/Support#mobile-app"
 
 const LiteExporter: React.FunctionComponent<LiteExporterProps> = props => {
     let url = "https://hyliu.me/fr2l/?"

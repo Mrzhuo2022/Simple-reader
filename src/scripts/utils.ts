@@ -13,12 +13,7 @@ export enum ActionStatus {
     Intermediate,
 }
 
-export type AppThunk<ReturnType = void> = ThunkAction<
-    ReturnType,
-    RootState,
-    unknown,
-    AnyAction
->
+export type AppThunk<ReturnType = void> = ThunkAction<ReturnType, RootState, unknown, AnyAction>
 
 export type AppDispatch = ThunkDispatch<RootState, undefined, AnyAction>
 
@@ -32,39 +27,30 @@ const rssParser = new Parser({
         ],
     },
 })
-type extractGeneric<Type> = Type extends Parser<infer _, infer U> ? U : never
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+type extractGeneric<Type> = Type extends Parser<infer _U, infer U> ? U : never
 export type MyParserItem = extractGeneric<typeof rssParser> & Parser.Item
 
-const CHARSET_RE = /charset=([^()<>@,;:\"/[\]?.=\s]*)/i
+const CHARSET_RE = /charset=([^()<>@,;:"/[\]?.=\s]*)/i
 const XML_ENCODING_RE = /^<\?xml.+encoding="(.+?)".*?\?>/i
 export async function decodeFetchResponse(response: Response, isHTML = false) {
     const buffer = await response.arrayBuffer()
-    let ctype =
-        response.headers.has("content-type") &&
-        response.headers.get("content-type")
-    let charset =
-        ctype && CHARSET_RE.test(ctype) ? CHARSET_RE.exec(ctype)[1] : undefined
+    let ctype = response.headers.has("content-type") && response.headers.get("content-type")
+    let charset = ctype && CHARSET_RE.test(ctype) ? CHARSET_RE.exec(ctype)[1] : undefined
     let content = new TextDecoder(charset).decode(buffer)
     if (charset === undefined) {
         if (isHTML) {
             const dom = domParser.parseFromString(content, "text/html")
-            charset = dom
-                .querySelector("meta[charset]")
-                ?.getAttribute("charset")
-                ?.toLowerCase()
+            charset = dom.querySelector("meta[charset]")?.getAttribute("charset")?.toLowerCase()
             if (!charset) {
                 ctype = dom
                     .querySelector("meta[http-equiv='Content-Type']")
                     ?.getAttribute("content")
-                charset =
-                    ctype &&
-                    CHARSET_RE.test(ctype) &&
-                    CHARSET_RE.exec(ctype)[1].toLowerCase()
+                charset = ctype && CHARSET_RE.test(ctype) && CHARSET_RE.exec(ctype)[1].toLowerCase()
             }
         } else {
             charset =
-                XML_ENCODING_RE.test(content) &&
-                XML_ENCODING_RE.exec(content)[1].toLowerCase()
+                XML_ENCODING_RE.test(content) && XML_ENCODING_RE.exec(content)[1].toLowerCase()
         }
         if (charset && charset !== "utf-8" && charset !== "utf8") {
             content = new TextDecoder(charset).decode(buffer)
@@ -82,9 +68,7 @@ export async function parseRSS(url: string) {
     }
     if (result && result.ok) {
         try {
-            return await rssParser.parseString(
-                await decodeFetchResponse(result)
-            )
+            return await rssParser.parseString(await decodeFetchResponse(result))
         } catch {
             throw new Error(intl.get("log.parseError"))
         }
@@ -97,29 +81,32 @@ export const domParser = new DOMParser()
 
 export async function fetchFavicon(url: string) {
     try {
-        url = url.split("/").slice(0, 3).join("/")
-        let result = await fetch(url, { credentials: "omit" })
+        const baseUrl = url.split("/").slice(0, 3).join("/")
+        const result = await fetch(baseUrl, { credentials: "omit" })
         if (result.ok) {
-            let html = await result.text()
-            let dom = domParser.parseFromString(html, "text/html")
-            let links = dom.getElementsByTagName("link")
-            for (let link of links) {
-                let rel = link.getAttribute("rel")
-                if (
-                    (rel === "icon" || rel === "shortcut icon") &&
-                    link.hasAttribute("href")
-                ) {
-                    let href = link.getAttribute("href")
-                    let parsedUrl = Url.parse(url)
-                    if (href.startsWith("//")) return parsedUrl.protocol + href
-                    else if (href.startsWith("/")) return url + href
-                    else return href
+            const html = await result.text()
+            const dom = domParser.parseFromString(html, "text/html")
+            const links = dom.getElementsByTagName("link")
+            for (const link of links) {
+                const rel = link.getAttribute("rel")
+                const href = link.getAttribute("href")
+                if (!rel || !href) continue
+
+                // 兼容更多 rel 写法（如 "icon shortcut"、"apple-touch-icon" 等），只要包含 "icon" 即视为图标
+                if (!/\bicon\b/i.test(rel)) continue
+
+                const parsedUrl = Url.parse(baseUrl)
+                if (href.startsWith("//") && parsedUrl.protocol) {
+                    return parsedUrl.protocol + href
                 }
+
+                // 使用 url.resolve 统一处理绝对路径、根路径和相对路径（如 "favicon.ico"）
+                return Url.resolve(baseUrl, href)
             }
         }
-        url = url + "/favicon.ico"
-        if (await validateFavicon(url)) {
-            return url
+        const fallback = baseUrl + "/favicon.ico"
+        if (await validateFavicon(fallback)) {
+            return fallback
         } else {
             return null
         }
@@ -127,9 +114,7 @@ export async function fetchFavicon(url: string) {
         return null
     }
 }
-
 export async function validateFavicon(url: string) {
-    let flag = false
     try {
         const result = await fetch(url, { credentials: "omit" })
         if (
@@ -137,20 +122,21 @@ export async function validateFavicon(url: string) {
             result.headers.has("Content-Type") &&
             result.headers.get("Content-Type").startsWith("image")
         ) {
-            flag = true
+            return true
         }
-    } finally {
-        return flag
+    } catch {
+        // ignore
     }
+    return false
 }
 
 export function htmlDecode(input: string) {
-    var doc = domParser.parseFromString(input, "text/html")
+    const doc = domParser.parseFromString(input, "text/html")
     return doc.documentElement.textContent
 }
 
 export const urlTest = (s: string) =>
-    /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,63}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/gi.test(
+    /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,63}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)/gi.test(
         s
     )
 
@@ -193,12 +179,8 @@ export function webSearch(text: string, engine = SearchEngines.Google) {
     }
 }
 
-export function mergeSortedArrays<T>(
-    a: T[],
-    b: T[],
-    cmp: (x: T, y: T) => number
-): T[] {
-    let merged = new Array<T>()
+export function mergeSortedArrays<T>(a: T[], b: T[], cmp: (x: T, y: T) => number): T[] {
+    const merged = new Array<T>()
     let i = 0
     let j = 0
     while (i < a.length && j < b.length) {
@@ -214,31 +196,25 @@ export function mergeSortedArrays<T>(
 }
 
 export function byteToMB(B: number) {
-    let MB = Math.round(B / 1048576)
+    if (typeof B !== "number" || isNaN(B)) return "0MB"
+    const MB = Math.round(B / 1048576)
     return MB + "MB"
 }
 
 function byteLength(str: string) {
-    var s = str.length
-    for (var i = str.length - 1; i >= 0; i--) {
-        var code = str.charCodeAt(i)
-        if (code > 0x7f && code <= 0x7ff) s++
-        else if (code > 0x7ff && code <= 0xffff) s += 2
-        if (code >= 0xdc00 && code <= 0xdfff) i-- //trail surrogate
-    }
-    return s
+    return new TextEncoder().encode(str).length
 }
 
 export function calculateItemSize(): Promise<number> {
     return new Promise((resolve, reject) => {
         let result = 0
-        let openRequest = window.indexedDB.open("itemsDB")
+        const openRequest = window.indexedDB.open("itemsDB")
         openRequest.onsuccess = () => {
-            let db = openRequest.result
-            let objectStore = db.transaction("items").objectStore("items")
-            let cursorRequest = objectStore.openCursor()
+            const db = openRequest.result
+            const objectStore = db.transaction("items").objectStore("items")
+            const cursorRequest = objectStore.openCursor()
             cursorRequest.onsuccess = () => {
-                let cursor = cursorRequest.result
+                const cursor = cursorRequest.result
                 if (cursor) {
                     result += byteLength(JSON.stringify(cursor.value))
                     cursor.continue()

@@ -1,7 +1,6 @@
 import * as React from "react"
 import { validateRegex } from "../../scripts/utils"
 import { FeedFilter, FilterType } from "../../scripts/models/feed"
-import { SourceTextDirection } from "../../scripts/models/source"
 
 type HighlightsProps = {
     text: string
@@ -10,13 +9,10 @@ type HighlightsProps = {
 }
 
 const Highlights: React.FunctionComponent<HighlightsProps> = props => {
-    const spans: [string, boolean][] = new Array()
+    const spans: [string, boolean][] = []
     const flags = props.filter.type & FilterType.CaseInsensitive ? "ig" : "g"
     let regex: RegExp
-    if (
-        props.filter.search === "" ||
-        !(regex = validateRegex(props.filter.search, flags))
-    ) {
+    if (props.filter.search === "" || !(regex = validateRegex(props.filter.search, flags))) {
         if (props.title) spans.push([props.text, false])
         else spans.push([props.text.substr(0, 325), false])
     } else if (props.title) {
@@ -26,10 +22,7 @@ const Highlights: React.FunctionComponent<HighlightsProps> = props => {
             match = regex.exec(props.text)
             if (match) {
                 if (startIndex != match.index) {
-                    spans.push([
-                        props.text.substring(startIndex, match.index),
-                        false,
-                    ])
+                    spans.push([props.text.substring(startIndex, match.index), false])
                 }
                 spans.push([match[0], true])
             } else {
@@ -44,10 +37,7 @@ const Highlights: React.FunctionComponent<HighlightsProps> = props => {
                     match.index - 25,
                     props.text.lastIndexOf(" ", Math.max(match.index - 10, 0))
                 )
-                spans.push([
-                    props.text.substring(Math.max(0, startIndex), match.index),
-                    false,
-                ])
+                spans.push([props.text.substring(Math.max(0, startIndex), match.index), false])
             }
             spans.push([match[0], true])
             if (regex.lastIndex < props.text.length) {
@@ -60,8 +50,14 @@ const Highlights: React.FunctionComponent<HighlightsProps> = props => {
 
     return (
         <>
-            {spans.map(([text, flag]) =>
-                flag ? <span className="h">{text}</span> : text
+            {spans.map(([text, flag], index) =>
+                flag ? (
+                    <span key={index} className="h">
+                        {text}
+                    </span>
+                ) : (
+                    text
+                )
             )}
         </>
     )

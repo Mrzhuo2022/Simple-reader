@@ -1,5 +1,5 @@
-import { applyMiddleware, combineReducers, createStore } from "redux"
-import thunkMiddleware from "redux-thunk"
+import { combineReducers } from "redux"
+import { configureStore } from "@reduxjs/toolkit"
 
 import { sourceReducer } from "./models/source"
 import { itemReducer } from "./models/item"
@@ -9,12 +9,7 @@ import { groupReducer } from "./models/group"
 import { pageReducer } from "./models/page"
 import { serviceReducer } from "./models/service"
 import { AppDispatch } from "./utils"
-import {
-    TypedUseSelectorHook,
-    useDispatch,
-    useSelector,
-    useStore,
-} from "react-redux"
+import { TypedUseSelectorHook, useDispatch, useSelector, useStore } from "react-redux"
 
 export const rootReducer = combineReducers({
     sources: sourceReducer,
@@ -26,10 +21,9 @@ export const rootReducer = combineReducers({
     app: appReducer,
 })
 
-export const rootStore = createStore(
-    rootReducer,
-    applyMiddleware<AppDispatch, RootState>(thunkMiddleware)
-)
+export const rootStore = configureStore({
+    reducer: rootReducer,
+})
 
 export type AppStore = typeof rootStore
 export type RootState = ReturnType<typeof rootReducer>

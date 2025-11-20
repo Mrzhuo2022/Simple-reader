@@ -3,6 +3,8 @@ import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react/lib/Icon"
 import { AnimationClassNames } from "@fluentui/react/lib/Styling"
 import AboutTab from "./settings/about"
+import AITab from "./settings/ai"
+import ShortcutsTab from "./settings/shortcuts"
 import { Pivot, PivotItem, Spinner, FocusTrapZone } from "@fluentui/react"
 import SourcesTabContainer from "../containers/settings/sources-container"
 import GroupsTabContainer from "../containers/settings/groups-container"
@@ -30,8 +32,7 @@ class Settings extends React.Component<SettingsProps> {
     componentDidUpdate = (prevProps: SettingsProps) => {
         if (this.props.display !== prevProps.display) {
             if (this.props.display) {
-                if (window.utils.platform === "darwin")
-                    window.utils.destroyTouchBar()
+                if (window.utils.platform === "darwin") window.utils.destroyTouchBar()
                 document.body.addEventListener("keydown", this.onKeyDown)
             } else {
                 if (window.utils.platform === "darwin") initTouchBarWithTexts()
@@ -49,56 +50,57 @@ class Settings extends React.Component<SettingsProps> {
                         position: "absolute",
                         top: 70,
                         left: "calc(50% - 404px)",
-                    }}>
+                    }}
+                >
                     <a
-                        className={
-                            "btn" + (this.props.exitting ? " disabled" : "")
-                        }
+                        className={"btn" + (this.props.exitting ? " disabled" : "")}
                         title={intl.get("settings.exit")}
-                        onClick={this.props.close}>
+                        onClick={this.props.close}
+                    >
                         <Icon iconName="Back" />
                     </a>
                 </div>
-                <div className={"settings " + AnimationClassNames.slideUpIn20}>
+                <div
+                    className={"settings " + AnimationClassNames.slideUpIn20}
+                    style={{ marginBottom: 40, height: "calc(100% - 104px)" }}
+                >
                     {this.props.blocked && (
-                        <FocusTrapZone
-                            isClickableOutsideFocusTrap={true}
-                            className="loading">
-                            <Spinner
-                                label={intl.get("settings.fetching")}
-                                tabIndex={0}
-                            />
+                        <FocusTrapZone isClickableOutsideFocusTrap={true} className="loading">
+                            <Spinner label={intl.get("settings.fetching")} tabIndex={0} />
                         </FocusTrapZone>
                     )}
                     <Pivot>
-                        <PivotItem
-                            headerText={intl.get("settings.sources")}
-                            itemIcon="Source">
+                        <PivotItem headerText={intl.get("settings.sources")} itemIcon="Source">
                             <SourcesTabContainer />
                         </PivotItem>
-                        <PivotItem
-                            headerText={intl.get("settings.grouping")}
-                            itemIcon="GroupList">
+                        <PivotItem headerText={intl.get("settings.grouping")} itemIcon="GroupList">
                             <GroupsTabContainer />
                         </PivotItem>
                         <PivotItem
                             headerText={intl.get("settings.rules")}
-                            itemIcon="FilterSettings">
+                            itemIcon="FilterSettings"
+                        >
                             <RulesTabContainer />
                         </PivotItem>
                         <PivotItem
                             headerText={intl.get("settings.service")}
-                            itemIcon="CloudImportExport">
+                            itemIcon="CloudImportExport"
+                        >
                             <ServiceTabContainer />
                         </PivotItem>
-                        <PivotItem
-                            headerText={intl.get("settings.app")}
-                            itemIcon="Settings">
+                        <PivotItem headerText={intl.get("settings.app")} itemIcon="Settings">
                             <AppTabContainer />
                         </PivotItem>
                         <PivotItem
-                            headerText={intl.get("settings.about")}
-                            itemIcon="Info">
+                            headerText={intl.get("settings.shortcuts")}
+                            itemIcon="KeyboardClassic"
+                        >
+                            <ShortcutsTab />
+                        </PivotItem>
+                        <PivotItem headerText={intl.get("settings.ai")} itemIcon="Lightbulb">
+                            <AITab />
+                        </PivotItem>
+                        <PivotItem headerText={intl.get("settings.about")} itemIcon="Info">
                             <AboutTab />
                         </PivotItem>
                     </Pivot>

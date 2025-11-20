@@ -15,8 +15,7 @@ interface FeedContainerProps {
 
 const getSources = (state: RootState) => state.sources
 const getItems = (state: RootState) => state.items
-const getFeed = (state: RootState, props: FeedContainerProps) =>
-    state.feeds[props.feedId]
+const getFeed = (state: RootState, props: FeedContainerProps) => state.feeds[props.feedId]
 const getFilter = (state: RootState) => state.page.filter
 const getView = (_, props: FeedContainerProps) => props.viewType
 const getViewConfigs = (state: RootState) => state.page.viewConfigs
@@ -24,15 +23,7 @@ const getCurrentItem = (state: RootState) => state.page.itemId
 
 const makeMapStateToProps = () => {
     return createSelector(
-        [
-            getSources,
-            getItems,
-            getFeed,
-            getView,
-            getFilter,
-            getViewConfigs,
-            getCurrentItem,
-        ],
+        [getSources, getItems, getFeed, getView, getFilter, getViewConfigs, getCurrentItem],
         (sources, items, feed, viewType, filter, viewConfigs, currentItem) => ({
             feed: feed,
             items: feed.iids.map(iid => items[iid]),
@@ -46,11 +37,9 @@ const makeMapStateToProps = () => {
 }
 const mapDispatchToProps = dispatch => {
     return {
-        shortcuts: (item: RSSItem, e: KeyboardEvent) =>
-            dispatch(itemShortcuts(item, e)),
+        shortcuts: (item: RSSItem, e: KeyboardEvent) => dispatch(itemShortcuts(item, e)),
         markRead: (item: RSSItem) => dispatch(markRead(item)),
-        contextMenu: (feedId: string, item: RSSItem, e) =>
-            dispatch(openItemMenu(item, feedId, e)),
+        contextMenu: (feedId: string, item: RSSItem, e) => dispatch(openItemMenu(item, feedId, e)),
         loadMore: (feed: RSSFeed) => dispatch(loadMore(feed)),
         showItem: (fid: string, item: RSSItem) => dispatch(showItem(fid, item)),
     }

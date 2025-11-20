@@ -1,9 +1,5 @@
 import { ipcRenderer } from "electron"
-import {
-    ImageCallbackTypes,
-    TouchBarTexts,
-    WindowStateListenerType,
-} from "../schema-types"
+import { ImageCallbackTypes, TouchBarTexts, WindowStateListenerType } from "../schema-types"
 import { IObjectWithKey } from "@fluentui/react"
 
 const utilsBridge = {
@@ -41,11 +37,7 @@ const utilsBridge = {
     },
 
     showSaveDialog: async (filters: Electron.FileFilter[], path: string) => {
-        let result = (await ipcRenderer.invoke(
-            "show-save-dialog",
-            filters,
-            path
-        )) as boolean
+        const result = (await ipcRenderer.invoke("show-save-dialog", filters, path)) as boolean
         if (result) {
             return (result: string, errmsg: string) => {
                 ipcRenderer.invoke("write-save-result", result, errmsg)
@@ -67,16 +59,14 @@ const utilsBridge = {
         await ipcRenderer.invoke("clear-cache")
     },
 
-    addMainContextListener: (
-        callback: (pos: [number, number], text: string) => any
-    ) => {
+    addMainContextListener: (callback: (pos: [number, number], text: string) => void) => {
         ipcRenderer.removeAllListeners("window-context-menu")
         ipcRenderer.on("window-context-menu", (_, pos, text) => {
             callback(pos, text)
         })
     },
     addWebviewContextListener: (
-        callback: (pos: [number, number], text: string, url: string) => any
+        callback: (pos: [number, number], text: string, url: string) => void
     ) => {
         ipcRenderer.removeAllListeners("webview-context-menu")
         ipcRenderer.on("webview-context-menu", (_, pos, text, url) => {
@@ -87,14 +77,14 @@ const utilsBridge = {
         ipcRenderer.invoke("image-callback", type)
     },
 
-    addWebviewKeydownListener: (callback: (event: Electron.Input) => any) => {
+    addWebviewKeydownListener: (callback: (event: Electron.Input) => void) => {
         ipcRenderer.removeAllListeners("webview-keydown")
         ipcRenderer.on("webview-keydown", (_, input) => {
             callback(input)
         })
     },
 
-    addWebviewErrorListener: (callback: (reason: string) => any) => {
+    addWebviewErrorListener: (callback: (reason: string) => void) => {
         ipcRenderer.removeAllListeners("webview-error")
         ipcRenderer.on("webview-error", (_, reason) => {
             callback(reason)
@@ -129,9 +119,7 @@ const utilsBridge = {
     requestAttention: () => {
         ipcRenderer.invoke("request-attention")
     },
-    addWindowStateListener: (
-        callback: (type: WindowStateListenerType, state: boolean) => any
-    ) => {
+    addWindowStateListener: (callback: (type: WindowStateListenerType, state: boolean) => void) => {
         ipcRenderer.removeAllListeners("maximized")
         ipcRenderer.on("maximized", () => {
             callback(WindowStateListenerType.Maximized, true)
@@ -158,7 +146,7 @@ const utilsBridge = {
         })
     },
 
-    addTouchBarEventsListener: (callback: (IObjectWithKey) => any) => {
+    addTouchBarEventsListener: (callback: (arg: IObjectWithKey) => void) => {
         ipcRenderer.removeAllListeners("touchbar-event")
         ipcRenderer.on("touchbar-event", (_, key: string) => {
             callback({ key: key })

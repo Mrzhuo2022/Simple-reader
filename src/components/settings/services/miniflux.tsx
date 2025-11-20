@@ -30,10 +30,7 @@ type MinifluxConfigsTabState = {
     importGroups: boolean
 }
 
-class MinifluxConfigsTab extends React.Component<
-    ServiceConfigsTabProps,
-    MinifluxConfigsTabState
-> {
+class MinifluxConfigsTab extends React.Component<ServiceConfigsTabProps, MinifluxConfigsTabState> {
     constructor(props: ServiceConfigsTabProps) {
         super(props)
         const configs = props.configs as MinifluxConfigs
@@ -65,29 +62,27 @@ class MinifluxConfigsTab extends React.Component<
     }
 
     authenticationOptions = (): IDropdownOption[] => [
-        { key: "apiKey", text: "API Key" /*intl.get("service.password")*/ },
+        { key: "apiKey", text: "API Key" },
         {
             key: "userPass",
-            text:
-                intl.get("service.username") +
-                "/" +
-                intl.get("service.password"),
+            text: intl.get("service.username") + "/" + intl.get("service.password"),
         },
     ]
     onAuthenticationOptionsChange = (_, option: IDropdownOption) => {
         this.setState({ apiKeyAuth: option.key == "apiKey" })
     }
 
-    handleInputChange = event => {
-        const name: string = event.target.name
-        // @ts-expect-error
-        this.setState({ [name]: event.target.value })
+    handleInputChange = (event: React.FormEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        const name = event.currentTarget.name as keyof Pick<
+            MinifluxConfigsTabState,
+            "endpoint" | "username" | "password" | "apiKey"
+        >
+        const value = event.currentTarget.value
+        this.setState({ [name]: value } as Pick<MinifluxConfigsTabState, typeof name>)
     }
 
     checkNotEmpty = (v: string) => {
-        return !this.state.existing && v.length == 0
-            ? intl.get("emptyField")
-            : ""
+        return !this.state.existing && v.length == 0 ? intl.get("emptyField") : ""
     }
 
     validateForm = () => {
@@ -142,10 +137,7 @@ class MinifluxConfigsTab extends React.Component<
             this.props.sync()
         } else {
             this.props.blockActions()
-            window.utils.showErrorBox(
-                intl.get("service.failure"),
-                intl.get("service.failureHint")
-            )
+            window.utils.showErrorBox(intl.get("service.failure"), intl.get("service.failureHint"))
         }
     }
 
@@ -179,9 +171,7 @@ class MinifluxConfigsTab extends React.Component<
                         <Stack.Item grow>
                             <TextField
                                 onGetErrorMessage={v =>
-                                    urlTest(v.trim())
-                                        ? ""
-                                        : intl.get("sources.badUrl")
+                                    urlTest(v.trim()) ? "" : intl.get("sources.badUrl")
                                 }
                                 validateOnLoad={false}
                                 name="endpoint"
@@ -197,11 +187,7 @@ class MinifluxConfigsTab extends React.Component<
                         <Stack.Item grow>
                             <Dropdown
                                 options={this.authenticationOptions()}
-                                selectedKey={
-                                    this.state.apiKeyAuth
-                                        ? "apiKey"
-                                        : "userPass"
-                                }
+                                selectedKey={this.state.apiKeyAuth ? "apiKey" : "userPass"}
                                 onChange={this.onAuthenticationOptionsChange}
                             />
                         </Stack.Item>
@@ -215,9 +201,7 @@ class MinifluxConfigsTab extends React.Component<
                                 <TextField
                                     type="password"
                                     placeholder={
-                                        this.state.existing
-                                            ? intl.get("service.unchanged")
-                                            : ""
+                                        this.state.existing ? intl.get("service.unchanged") : ""
                                     }
                                     onGetErrorMessage={this.checkNotEmpty}
                                     validateOnLoad={false}
@@ -254,9 +238,7 @@ class MinifluxConfigsTab extends React.Component<
                                 <TextField
                                     type="password"
                                     placeholder={
-                                        this.state.existing
-                                            ? intl.get("service.unchanged")
-                                            : ""
+                                        this.state.existing ? intl.get("service.unchanged") : ""
                                     }
                                     onGetErrorMessage={this.checkNotEmpty}
                                     validateOnLoad={false}
@@ -283,9 +265,7 @@ class MinifluxConfigsTab extends React.Component<
                         <Checkbox
                             label={intl.get("service.importGroups")}
                             checked={this.state.importGroups}
-                            onChange={(_, c) =>
-                                this.setState({ importGroups: c })
-                            }
+                            onChange={(_, c) => this.setState({ importGroups: c })}
                         />
                     )}
                     <Stack horizontal style={{ marginTop: 32 }}>
@@ -293,19 +273,12 @@ class MinifluxConfigsTab extends React.Component<
                             <PrimaryButton
                                 disabled={!this.validateForm()}
                                 onClick={this.save}
-                                text={
-                                    this.state.existing
-                                        ? intl.get("edit")
-                                        : intl.get("confirm")
-                                }
+                                text={this.state.existing ? intl.get("edit") : intl.get("confirm")}
                             />
                         </Stack.Item>
                         <Stack.Item>
                             {this.state.existing ? (
-                                <DangerButton
-                                    onClick={this.remove}
-                                    text={intl.get("delete")}
-                                />
+                                <DangerButton onClick={this.remove} text={intl.get("delete")} />
                             ) : (
                                 <DefaultButton
                                     onClick={this.props.exit}

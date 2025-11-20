@@ -19,9 +19,7 @@ const CardInfo: React.FunctionComponent<CardInfoProps> = props => (
                 <span className="creator">{props.item.creator}</span>
             )}
         </span>
-        {props.item.starred ? (
-            <span className="starred-indicator"></span>
-        ) : null}
+        {props.item.starred ? <span className="starred-indicator"></span> : null}
         {props.item.hasRead ? null : <span className="read-indicator"></span>}
         {props.hideTime ? null : <Time date={props.item.date} />}
     </p>

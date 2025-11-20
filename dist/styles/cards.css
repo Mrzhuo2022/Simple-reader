@@ -251,8 +251,7 @@
     padding: 24px;
     max-height: 160px;
     display: flex;
-    transition: box-shadow linear 0.08s, background-color linear 0.08s,
-        transform linear 0.08s;
+    transition: box-shadow linear 0.08s, background-color linear 0.08s, transform linear 0.08s;
     border-bottom: 1px solid var(--neutralQuaternaryAlt);
     box-shadow: #0000 0 5px 20px;
 }

@@ -8,19 +8,18 @@ import SettingsContainer from "../containers/settings-container"
 import { RootState } from "../scripts/reducer"
 import { ContextMenu } from "./context-menu"
 import LogMenu from "./log-menu"
+import { TranslationPopup } from "./translation-popup"
 
 const Root = ({ locale, dispatch }) =>
     locale && (
-        <div
-            id="root"
-            key={locale}
-            onMouseDown={() => dispatch(closeContextMenu())}>
+        <div id="root" key={locale} onMouseDown={() => dispatch(closeContextMenu())}>
             <NavContainer />
             <PageContainer />
             <LogMenu />
             <MenuContainer />
             <SettingsContainer />
             <ContextMenu />
+            <TranslationPopup />
         </div>
     )
 

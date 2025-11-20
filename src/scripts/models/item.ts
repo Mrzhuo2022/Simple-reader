@@ -2,27 +2,11 @@ import * as db from "../db"
 import lf from "lovefield"
 import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
-import {
-    domParser,
-    htmlDecode,
-    ActionStatus,
-    AppThunk,
-    platformCtrl,
-} from "../utils"
+import { domParser, htmlDecode, ActionStatus, AppThunk, platformCtrl } from "../utils"
 import { RSSSource, updateSource, updateUnreadCounts } from "./source"
 import { FeedActionTypes, INIT_FEED, LOAD_MORE, dismissItems } from "./feed"
-import {
-    pushNotification,
-    setupAutoFetch,
-    SettingsActionTypes,
-    FREE_MEMORY,
-} from "./app"
-import {
-    getServiceHooks,
-    syncWithService,
-    ServiceActionTypes,
-    SYNC_LOCAL_ITEMS,
-} from "./service"
+import { pushNotification, setupAutoFetch, SettingsActionTypes, FREE_MEMORY } from "./app"
+import { getServiceHooks, syncWithService, ServiceActionTypes, SYNC_LOCAL_ITEMS } from "./service"
 
 export class RSSItem {
     _id: number
@@ -39,15 +23,18 @@ export class RSSItem {
     starred: boolean
     hidden: boolean
     notify: boolean
+    autoTranslate?: boolean
+    autoSummarize?: boolean
+    autoFullText?: boolean
     serviceRef?: string
 
     constructor(item: MyParserItem, source: RSSSource) {
-        for (let field of ["title", "link", "creator"]) {
+        for (const field of ["title", "link", "creator"]) {
             const content = item[field]
             if (content && typeof content !== "string") delete item[field]
         }
         this.source = source.sid
-        this.title = item.title || intl.get("article.untitled")
+        this.title = item.title || intl.get("nav.untitled")
         this.link = item.link || ""
         this.fetchedDate = new Date()
         this.date = new Date(item.isoDate ?? item.pubDate ?? this.fetchedDate)
@@ -59,7 +46,7 @@ export class RSSItem {
     }
 
     static parseContent(item: RSSItem, parsed: MyParserItem) {
-        for (let field of ["thumb", "content", "fullContent"]) {
+        for (const field of ["thumb", "content", "fullContent"]) {
             const content = parsed[field]
             if (content && typeof content !== "string") delete parsed[field]
         }
@@ -77,27 +64,18 @@ export class RSSItem {
         } else if (parsed.image && typeof parsed.image === "string") {
             item.thumb = parsed.image
         } else if (parsed.mediaContent) {
-            let images = parsed.mediaContent.filter(
-                c => c.$ && c.$.medium === "image" && c.$.url
-            )
+            const images = parsed.mediaContent.filter(c => c.$ && c.$.medium === "image" && c.$.url)
             if (images.length > 0) item.thumb = images[0].$.url
         }
         if (!item.thumb) {
-            let dom = domParser.parseFromString(item.content, "text/html")
-            let baseEl = dom.createElement("base")
-            baseEl.setAttribute(
-                "href",
-                item.link.split("/").slice(0, 3).join("/")
-            )
+            const dom = domParser.parseFromString(item.content, "text/html")
+            const baseEl = dom.createElement("base")
+            baseEl.setAttribute("href", item.link.split("/").slice(0, 3).join("/"))
             dom.head.append(baseEl)
-            let img = dom.querySelector("img")
+            const img = dom.querySelector("img")
             if (img && img.src) item.thumb = img.src
         }
-        if (
-            item.thumb &&
-            !item.thumb.startsWith("https://") &&
-            !item.thumb.startsWith("http://")
-        ) {
+        if (item.thumb && !item.thumb.startsWith("https://") && !item.thumb.startsWith("http://")) {
             delete item.thumb
         }
     }
@@ -167,10 +145,7 @@ export function fetchItemsRequest(fetchCount = 0): ItemActionTypes {
     }
 }
 
-export function fetchItemsSuccess(
-    items: RSSItem[],
-    itemState: ItemState
-): ItemActionTypes {
+export function fetchItemsSuccess(items: RSSItem[], itemState: ItemState): ItemActionTypes {
     return {
         type: FETCH_ITEMS,
         status: ActionStatus.Success,
@@ -198,76 +173,54 @@ export function fetchItemsIntermediate(): ItemActionTypes {
 export async function insertItems(items: RSSItem[]): Promise<RSSItem[]> {
     items.sort((a, b) => a.date.getTime() - b.date.getTime())
     const rows = items.map(item => db.items.createRow(item))
-    return (await db.itemsDB
-        .insert()
-        .into(db.items)
-        .values(rows)
-        .exec()) as RSSItem[]
+    return (await db.itemsDB.insert().into(db.items).values(rows).exec()) as RSSItem[]
 }
 
-export function fetchItems(
-    background = false,
-    sids: number[] = null
-): AppThunk<Promise<void>> {
+export function fetchItems(background = false, sids: number[] = null): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
-        let promises = new Array<Promise<RSSItem[]>>()
+        const promises = new Array<Promise<RSSItem[]>>()
         const initState = getState()
         if (!initState.app.fetchingItems && !initState.app.syncing) {
             if (
                 sids === null ||
-                sids.filter(
-                    sid => initState.sources[sid].serviceRef !== undefined
-                ).length > 0
+                sids.filter(sid => initState.sources[sid].serviceRef !== undefined).length > 0
             )
                 await dispatch(syncWithService(background))
-            let timenow = new Date().getTime()
+            const timenow = new Date().getTime()
             const sourcesState = getState().sources
-            let sources =
+            const sources =
                 sids === null
                     ? Object.values(sourcesState).filter(s => {
-                          let last = s.lastFetched ? s.lastFetched.getTime() : 0
+                          const last = s.lastFetched ? s.lastFetched.getTime() : 0
                           return (
                               !s.serviceRef &&
-                              (last > timenow ||
-                                  last + (s.fetchFrequency || 0) * 60000 <=
-                                      timenow)
+                              (last > timenow || last + (s.fetchFrequency || 0) * 60000 <= timenow)
                           )
                       })
-                    : sids
-                          .map(sid => sourcesState[sid])
-                          .filter(s => !s.serviceRef)
-            for (let source of sources) {
-                let promise = RSSSource.fetchItems(source)
-                promise.then(() =>
-                    dispatch(
-                        updateSource({ ...source, lastFetched: new Date() })
-                    )
-                )
+                    : sids.map(sid => sourcesState[sid]).filter(s => !s.serviceRef)
+            for (const source of sources) {
+                const promise = RSSSource.fetchItems(source)
+                promise.then(() => dispatch(updateSource({ ...source, lastFetched: new Date() })))
                 promise.finally(() => dispatch(fetchItemsIntermediate()))
                 promises.push(promise)
             }
             dispatch(fetchItemsRequest(promises.length))
             const results = await Promise.allSettled(promises)
             return await new Promise<void>((resolve, reject) => {
-                let items = new Array<RSSItem>()
+                const items = new Array<RSSItem>()
                 results.map((r, i) => {
                     if (r.status === "fulfilled") items.push(...r.value)
                     else {
-                        console.log(r.reason)
+                        console.warn(r.reason)
                         dispatch(fetchItemsFailure(sources[i], r.reason))
                     }
                 })
                 insertItems(items)
                     .then(inserted => {
-                        dispatch(
-                            fetchItemsSuccess(
-                                inserted.reverse(),
-                                getState().items
-                            )
-                        )
+                        dispatch(fetchItemsSuccess(inserted.reverse(), getState().items))
                         resolve()
                         if (background) {
-                            for (let item of inserted) {
+                            for (const item of inserted) {
                                 if (item.notify) {
                                     dispatch(pushNotification(item))
                                 }
@@ -282,11 +235,8 @@ export function fetchItems(
                     })
                     .catch(err => {
                         dispatch(fetchItemsSuccess([], getState().items))
-                        window.utils.showErrorBox(
-                            "A database error has occurred.",
-                            String(err)
-                        )
-                        console.log(err)
+                        window.utils.showErrorBox("A database error has occurred.", String(err))
+                        console.error(err)
                         reject(err)
                     })
             })
@@ -327,32 +277,19 @@ export function markAllRead(
     before = true
 ): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
-        let state = getState()
+        const state = getState()
         if (sids === null) {
-            let feed = state.feeds[state.page.feedId]
+            const feed = state.feeds[state.page.feedId]
             sids = feed.sids
         }
-        const action = dispatch(getServiceHooks()).markAllRead?.(
-            sids,
-            date,
-            before
-        )
+        const action = dispatch(getServiceHooks()).markAllRead?.(sids, date, before)
         if (action) await dispatch(action)
-        const predicates: lf.Predicate[] = [
-            db.items.source.in(sids),
-            db.items.hasRead.eq(false),
-        ]
+        const predicates: lf.Predicate[] = [db.items.source.in(sids), db.items.hasRead.eq(false)]
         if (date) {
-            predicates.push(
-                before ? db.items.date.lte(date) : db.items.date.gte(date)
-            )
+            predicates.push(before ? db.items.date.lte(date) : db.items.date.gte(date))
         }
         const query = lf.op.and.apply(null, predicates)
-        await db.itemsDB
-            .update(db.items)
-            .set(db.items.hasRead, true)
-            .where(query)
-            .exec()
+        await db.itemsDB.update(db.items).set(db.items.hasRead, true).where(query).exec()
         if (date) {
             dispatch({
                 type: MARK_ALL_READ,
@@ -427,6 +364,57 @@ export function toggleHidden(item: RSSItem): AppThunk {
 export function itemShortcuts(item: RSSItem, e: KeyboardEvent): AppThunk {
     return dispatch => {
         if (e.metaKey) return
+        const shortcuts =
+            (window.settings && window.settings.getShortcuts
+                ? window.settings.getShortcuts()
+                : null) || null
+
+        const isMatch = (shortcut: string | undefined, ev: KeyboardEvent) => {
+            if (!shortcut) return false
+            const parts = shortcut.toLowerCase().split("+")
+            const key = parts[parts.length - 1]
+            const needCtrl = parts.includes("ctrl") || parts.includes("control")
+            const needMeta =
+                parts.includes("meta") || parts.includes("command") || parts.includes("cmd")
+            const needAlt = parts.includes("alt")
+            const needShift = parts.includes("shift")
+
+            const inputKey = ev.key.toLowerCase()
+
+            if (inputKey !== key) return false
+            if (!!ev.ctrlKey !== needCtrl) return false
+            if (!!ev.metaKey !== needMeta) return false
+            if (!!ev.altKey !== needAlt) return false
+            if (!!ev.shiftKey !== needShift) return false
+
+            return true
+        }
+
+        if (shortcuts) {
+            if (isMatch(shortcuts.markRead, e)) {
+                if (item.hasRead) dispatch(markUnread(item))
+                else dispatch(markRead(item))
+                return
+            }
+            if (isMatch(shortcuts.openExternal, e)) {
+                if (!item.hasRead) dispatch(markRead(item))
+                window.utils.openExternal(item.link, platformCtrl(e))
+                return
+            }
+            if (isMatch(shortcuts.star, e)) {
+                dispatch(toggleStarred(item))
+                return
+            }
+            if (isMatch(shortcuts.hide, e)) {
+                if (!item.hasRead && !item.hidden) dispatch(markRead(item))
+                dispatch(toggleHidden(item))
+                return
+            }
+            // 若有快捷键配置但未命中，则不再使用旧默认按键
+            return
+        }
+
+        // 若无法读取快捷键配置（极端情况），回退到内置默认按键
         switch (e.key) {
             case "m":
             case "M":
@@ -452,7 +440,7 @@ export function itemShortcuts(item: RSSItem, e: KeyboardEvent): AppThunk {
 }
 
 export function applyItemReduction(item: RSSItem, type: string) {
-    let nextItem = { ...item }
+    const nextItem = { ...item }
     switch (type) {
         case MARK_READ:
         case MARK_UNREAD: {
@@ -473,18 +461,14 @@ export function applyItemReduction(item: RSSItem, type: string) {
 
 export function itemReducer(
     state: ItemState = {},
-    action:
-        | ItemActionTypes
-        | FeedActionTypes
-        | ServiceActionTypes
-        | SettingsActionTypes
+    action: ItemActionTypes | FeedActionTypes | ServiceActionTypes | SettingsActionTypes
 ): ItemState {
     switch (action.type) {
         case FETCH_ITEMS:
             switch (action.status) {
                 case ActionStatus.Success: {
-                    let newMap = {}
-                    for (let i of action.items) {
+                    const newMap = {}
+                    for (const i of action.items) {
                         newMap[i._id] = i
                     }
                     return { ...newMap, ...state }
@@ -498,16 +482,13 @@ export function itemReducer(
         case TOGGLE_HIDDEN: {
             return {
                 ...state,
-                [action.item._id]: applyItemReduction(
-                    state[action.item._id],
-                    action.type
-                ),
+                [action.item._id]: applyItemReduction(state[action.item._id], action.type),
             }
         }
         case MARK_ALL_READ: {
-            let nextState = { ...state }
-            let sids = new Set(action.sids)
-            for (let item of Object.values(state)) {
+            const nextState = { ...state }
+            const sids = new Set(action.sids)
+            for (const item of Object.values(state)) {
                 if (sids.has(item.source) && !item.hasRead) {
                     if (
                         !action.time ||
@@ -528,8 +509,8 @@ export function itemReducer(
         case INIT_FEED: {
             switch (action.status) {
                 case ActionStatus.Success: {
-                    let nextState = { ...state }
-                    for (let i of action.items) {
+                    const nextState = { ...state }
+                    for (const i of action.items) {
                         nextState[i._id] = i
                     }
                     return nextState
@@ -539,9 +520,9 @@ export function itemReducer(
             }
         }
         case SYNC_LOCAL_ITEMS: {
-            let nextState = { ...state }
-            for (let item of Object.values(state)) {
-                if (item.hasOwnProperty("serviceRef")) {
+            const nextState = { ...state }
+            for (const item of Object.values(state)) {
+                if (Object.prototype.hasOwnProperty.call(item, "serviceRef")) {
                     const nextItem = { ...item }
                     nextItem.hasRead = !action.unreadIds.has(item.serviceRef)
                     nextItem.starred = action.starredIds.has(item.serviceRef)
@@ -552,7 +533,7 @@ export function itemReducer(
         }
         case FREE_MEMORY: {
             const nextState: ItemState = {}
-            for (let item of Object.values(state)) {
+            for (const item of Object.values(state)) {
                 if (action.iids.has(item._id)) nextState[item._id] = item
             }
             return nextState

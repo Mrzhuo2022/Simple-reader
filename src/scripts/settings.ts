@@ -5,12 +5,12 @@ import { ThemeSettings } from "../schema-types"
 import intl from "react-intl-universal"
 import { SourceTextDirection } from "./models/source"
 
-let lightTheme: IPartialTheme = {
+const lightTheme: IPartialTheme = {
     defaultFontStyle: {
         fontFamily: '"Segoe UI", "Source Han Sans Regular", sans-serif',
     },
 }
-let darkTheme: IPartialTheme = {
+const darkTheme: IPartialTheme = {
     ...lightTheme,
     palette: {
         neutralLighterAlt: "#282828",
@@ -62,8 +62,7 @@ export function setThemeDefaultFont(locale: string) {
             lightTheme.defaultFontStyle.fontFamily =
                 '"Segoe UI", "Source Han Sans Regular", sans-serif'
     }
-    darkTheme.defaultFontStyle.fontFamily =
-        lightTheme.defaultFontStyle.fontFamily
+    darkTheme.defaultFontStyle.fontFamily = lightTheme.defaultFontStyle.fontFamily
     applyThemeSettings()
 }
 export function setThemeSettings(theme: ThemeSettings) {
@@ -89,12 +88,9 @@ export function getCurrentLocale() {
 
 export async function exportAll() {
     const filters = [{ name: intl.get("app.frData"), extensions: ["frdata"] }]
-    const write = await window.utils.showSaveDialog(
-        filters,
-        "*/Fluent_Reader_Backup.frdata"
-    )
+    const write = await window.utils.showSaveDialog(filters, "*/Simple_Reader_Backup.frdata")
     if (write) {
-        let output = window.settings.getAll()
+        const output = window.settings.getAll()
         output["lovefield"] = {
             sources: await db.sourcesDB.select().from(db.sources).exec(),
             items: await db.itemsDB.select().from(db.items).exec(),
@@ -105,9 +101,9 @@ export async function exportAll() {
 
 export async function importAll() {
     const filters = [{ name: intl.get("app.frData"), extensions: ["frdata"] }]
-    let data = await window.utils.showOpenDialog(filters)
+    const data = await window.utils.showOpenDialog(filters)
     if (!data) return true
-    let confirmed = await window.utils.showMessageBox(
+    const confirmed = await window.utils.showMessageBox(
         intl.get("app.restore"),
         intl.get("app.confirmImport"),
         intl.get("confirm"),
@@ -116,21 +112,19 @@ export async function importAll() {
         "warning"
     )
     if (!confirmed) return true
-    let configs = JSON.parse(data)
+    const configs = JSON.parse(data)
     await db.sourcesDB.delete().from(db.sources).exec()
     await db.itemsDB.delete().from(db.items).exec()
     if (configs.nedb) {
-        let openRequest = window.indexedDB.open("NeDB")
+        const openRequest = window.indexedDB.open("NeDB")
         configs.useNeDB = true
         openRequest.onsuccess = () => {
-            let db = openRequest.result
-            let objectStore = db
-                .transaction("nedbdata", "readwrite")
-                .objectStore("nedbdata")
-            let requests = Object.entries(configs.nedb).map(([key, value]) => {
+            const db = openRequest.result
+            const objectStore = db.transaction("nedbdata", "readwrite").objectStore("nedbdata")
+            const requests = Object.entries(configs.nedb).map(([key, value]) => {
                 return objectStore.put(value, key)
             })
-            let promises = requests.map(
+            const promises = requests.map(
                 req =>
                     new Promise<void>((resolve, reject) => {
                         req.onsuccess = () => resolve()

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { FeedContainer } from "../containers/feed-container"
-import { AnimationClassNames, Icon, FocusTrapZone } from "@fluentui/react"
+import { Icon, FocusTrapZone } from "@fluentui/react"
 import ArticleContainer from "../containers/article-container"
 import { ViewType } from "../schema-types"
 import ArticleSearch from "./utils/article-search"
@@ -29,11 +29,7 @@ class Page extends React.Component<PageProps> {
         this.props.viewType !== ViewType.List ? (
             <>
                 {this.props.settingsOn ? null : (
-                    <div
-                        key="card"
-                        className={
-                            "main" + (this.props.menuOn ? " menu-on" : "")
-                        }>
+                    <div key="card" className={"main" + (this.props.menuOn ? " menu-on" : "")}>
                         <ArticleSearch />
                         {this.props.feeds.map(fid => (
                             <FeedContainer
@@ -50,10 +46,9 @@ class Page extends React.Component<PageProps> {
                         ignoreExternalFocusing={true}
                         isClickableOutsideFocusTrap={true}
                         className="article-container"
-                        onClick={this.props.dismissItem}>
-                        <div
-                            className="article-wrapper"
-                            onClick={e => e.stopPropagation()}>
+                        onClick={this.props.dismissItem}
+                    >
+                        <div className="article-wrapper" onClick={e => e.stopPropagation()}>
                             <ArticleContainer itemId={this.props.itemId} />
                         </div>
                         {this.props.itemFromFeed && (
@@ -76,11 +71,7 @@ class Page extends React.Component<PageProps> {
         ) : (
             <>
                 {this.props.settingsOn ? null : (
-                    <div
-                        key="list"
-                        className={
-                            "list-main" + (this.props.menuOn ? " menu-on" : "")
-                        }>
+                    <div key="list" className={"list-main" + (this.props.menuOn ? " menu-on" : "")}>
                         <ArticleSearch />
                         <div className="list-feed-container">
                             {this.props.feeds.map(fid => (
@@ -97,14 +88,8 @@ class Page extends React.Component<PageProps> {
                             </div>
                         ) : (
                             <div className="side-logo-wrapper">
-                                <img
-                                    className="light"
-                                    src="icons/logo-outline.svg"
-                                />
-                                <img
-                                    className="dark"
-                                    src="icons/logo-outline-dark.svg"
-                                />
+                                <img className="light" src="icons/logo-outline.svg" />
+                                <img className="dark" src="icons/logo-outline-dark.svg" />
                             </div>
                         )}
                     </div>

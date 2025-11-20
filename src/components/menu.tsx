@@ -1,10 +1,10 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import { Icon } from "@fluentui/react/lib/Icon"
-import { Nav, INavLink, INavLinkGroup } from "office-ui-fabric-react/lib/Nav"
+import { Nav, INavLink, INavLinkGroup } from "@fluentui/react/lib/Nav"
 import { SourceGroup } from "../schema-types"
 import { SourceState, RSSSource } from "../scripts/models/source"
-import { ALL } from "../scripts/models/feed"
+import { ALL, STARRED } from "../scripts/models/feed"
 import { AnimationClassNames, Stack, FocusZone } from "@fluentui/react"
 
 export type MenuProps = {
@@ -17,6 +17,7 @@ export type MenuProps = {
     itemOn: boolean
     toggleMenu: () => void
     allArticles: (init?: boolean) => void
+    selectStarred: () => void
     selectSourceGroup: (group: SourceGroup, menuKey: string) => void
     selectSource: (source: RSSSource) => void
     groupContextMenu: (sids: number[], event: React.MouseEvent) => void
@@ -36,11 +37,18 @@ export class Menu extends React.Component<MenuProps> {
             links: [
                 {
                     name: intl.get("search"),
-                    ariaLabel:
-                        intl.get("search") + (this.props.searchOn ? " ✓" : " "),
+                    ariaLabel: intl.get("search") + (this.props.searchOn ? " ✓" : " "),
                     key: "search",
                     icon: "Search",
                     onClick: this.props.toggleSearch,
+                    url: null,
+                },
+                {
+                    name: intl.get("menu.starred"),
+                    ariaLabel: intl.get("menu.starred"),
+                    key: STARRED,
+                    icon: "FavoriteStar",
+                    onClick: this.props.selectStarred,
                     url: null,
                 },
                 {
@@ -55,8 +63,7 @@ export class Menu extends React.Component<MenuProps> {
                         ),
                     key: ALL,
                     icon: "TextDocument",
-                    onClick: () =>
-                        this.props.allArticles(this.props.selected !== ALL),
+                    onClick: () => this.props.allArticles(this.props.selected !== ALL),
                     url: null,
                 },
             ],
@@ -67,21 +74,18 @@ export class Menu extends React.Component<MenuProps> {
                 .filter(g => g.sids.length > 0)
                 .map(g => {
                     if (g.isMultiple) {
-                        let sources = g.sids.map(sid => this.props.sources[sid])
+                        const sources = g.sids.map(sid => this.props.sources[sid])
                         return {
                             name: g.name,
                             ariaLabel:
                                 g.name +
                                 this.countOverflow(
-                                    sources
-                                        .map(s => s.unreadCount)
-                                        .reduce((a, b) => a + b, 0)
+                                    sources.map(s => s.unreadCount).reduce((a, b) => a + b, 0)
                                 ),
                             key: "g-" + g.index,
                             url: null,
                             isExpanded: g.expanded,
-                            onClick: () =>
-                                this.props.selectSourceGroup(g, "g-" + g.index),
+                            onClick: () => this.props.selectSourceGroup(g, "g-" + g.index),
                             links: sources.map(this.getSource),
                         }
                     } else {
@@ -103,14 +107,17 @@ export class Menu extends React.Component<MenuProps> {
     getIconStyle = (url: string) => ({
         style: { width: 16 },
         imageProps: {
-            style: { width: "100%" },
+            style: { width: "100%", height: 16 },
             src: url,
+            onError: (e: React.SyntheticEvent<HTMLImageElement>) => {
+                ;(e.currentTarget as HTMLImageElement).style.display = "none"
+            },
         },
     })
 
     onContext = (item: INavLink, event: React.MouseEvent) => {
         let sids: number[]
-        let [type, index] = item.key.split("-")
+        const [type, index] = item.key.split("-")
         if (type === "s") {
             sids = [parseInt(index)]
         } else if (type === "g") {
@@ -122,15 +129,16 @@ export class Menu extends React.Component<MenuProps> {
     }
 
     _onRenderLink = (link: INavLink): JSX.Element => {
-        let count = link.ariaLabel.split(" ").pop()
+        const count = link.ariaLabel.split(" ").pop()
         return (
             <Stack
                 className="link-stack"
                 horizontal
                 grow
-                onContextMenu={event => this.onContext(link, event)}>
+                onContextMenu={event => this.onContext(link, event)}
+            >
                 <div className="link-text">{link.name}</div>
-                {count && count !== "0" && (
+                {count && count !== "0" && count !== link.name && (
                     <div className="unread-count">{count}</div>
                 )}
             </Stack>
@@ -138,37 +146,33 @@ export class Menu extends React.Component<MenuProps> {
     }
 
     _onRenderGroupHeader = (group: INavLinkGroup): JSX.Element => {
-        return (
-            <p className={"subs-header " + AnimationClassNames.slideDownIn10}>
-                {group.name}
-            </p>
-        )
+        return <p className={"subs-header " + AnimationClassNames.slideDownIn10}>{group.name}</p>
     }
 
     render() {
         return (
             this.props.status && (
                 <div
-                    className={
-                        "menu-container" + (this.props.display ? " show" : "")
-                    }
-                    onClick={this.props.toggleMenu}>
+                    className={"menu-container" + (this.props.display ? " show" : "")}
+                    onClick={this.props.toggleMenu}
+                >
                     <div
-                        className={
-                            "menu" + (this.props.itemOn ? " item-on" : "")
-                        }
-                        onClick={e => e.stopPropagation()}>
+                        className={"menu" + (this.props.itemOn ? " item-on" : "")}
+                        onClick={e => e.stopPropagation()}
+                    >
                         <div className="btn-group">
                             <a
                                 className="btn hide-wide"
                                 title={intl.get("menu.close")}
-                                onClick={this.props.toggleMenu}>
+                                onClick={this.props.toggleMenu}
+                            >
                                 <Icon iconName="Back" />
                             </a>
                             <a
                                 className="btn inline-block-wide"
                                 title={intl.get("menu.close")}
-                                onClick={this.props.toggleMenu}>
+                                onClick={this.props.toggleMenu}
+                            >
                                 <Icon
                                     iconName={
                                         window.utils.platform === "darwin"
@@ -178,10 +182,7 @@ export class Menu extends React.Component<MenuProps> {
                                 />
                             </a>
                         </div>
-                        <FocusZone
-                            as="div"
-                            disabled={!this.props.display}
-                            className="nav-wrapper">
+                        <FocusZone as="div" disabled={!this.props.display} className="nav-wrapper">
                             <Nav
                                 onRenderGroupHeader={this._onRenderGroupHeader}
                                 onRenderLink={this._onRenderLink}

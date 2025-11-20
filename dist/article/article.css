@@ -23,6 +23,8 @@ body.vertical {
     --gray: #484644;
     --primary: #0078d4;
     --primary-alt: #004578;
+    --summary-bg: #f3f2f1;
+    --spinner-bg: #e0e0e0;
 }
 @media (prefers-color-scheme: dark) {
     :root {
@@ -30,6 +32,8 @@ body.vertical {
         --gray: #a19f9d;
         --primary: #4ba0e1;
         --primary-alt: #65aee6;
+        --summary-bg: #2d2d30;
+        --spinner-bg: #3e3e42;
     }
 }
 

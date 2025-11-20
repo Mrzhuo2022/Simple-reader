@@ -62,9 +62,11 @@ async function fetchAPI(
         const headers = new Headers()
         headers.append("content-type", "application/x-www-form-urlencoded")
 
-        configs.apiKeyAuth
-            ? headers.append("X-Auth-Token", configs.authKey)
-            : headers.append("Authorization", `Basic ${configs.authKey}`)
+        if (configs.apiKeyAuth) {
+            headers.append("X-Auth-Token", configs.authKey)
+        } else {
+            headers.append("Authorization", `Basic ${configs.authKey}`)
+        }
 
         let baseUrl = configs.endpoint
         if (!baseUrl.endsWith("/")) baseUrl = baseUrl + "/"
@@ -77,7 +79,7 @@ async function fetchAPI(
 
         return response
     } catch (error) {
-        console.log(error)
+        console.error(error)
         throw APIError()
     }
 }
@@ -98,10 +100,9 @@ export const minifluxServiceHooks: ServiceHooks = {
 
         // fetch and create groups in redux
         if (configs.importGroups) {
-            const groups: Category[] = await fetchAPI(
-                configs,
-                "categories"
-            ).then(response => response.json())
+            const groups: Category[] = await fetchAPI(configs, "categories").then(response =>
+                response.json()
+            )
             groups.forEach(group => dispatch(createSourceGroup(group.title)))
         }
 
@@ -112,10 +113,10 @@ export const minifluxServiceHooks: ServiceHooks = {
         if (feeds === undefined) throw APIError()
 
         // go through feeds, create typed source while also mapping by group
-        let sources: RSSSource[] = new Array<RSSSource>()
-        let groupsMap: Map<string, string> = new Map<string, string>()
-        for (let feed of feeds) {
-            let source = new RSSSource(feed.feed_url, feed.title)
+        const sources: RSSSource[] = new Array<RSSSource>()
+        const groupsMap: Map<string, string> = new Map<string, string>()
+        for (const feed of feeds) {
+            const source = new RSSSource(feed.feed_url, feed.title)
             // associate service christened id to match in other request
             source.serviceRef = feed.id.toString()
             sources.push(source)
@@ -133,7 +134,7 @@ export const minifluxServiceHooks: ServiceHooks = {
     fetchItems: () => async (_, getState) => {
         const state = getState()
         const configs = state.service as MinifluxConfigs
-        const items: Entry[] = new Array()
+        const items: Entry[] = []
         let entriesResponse: Entries
 
         // parameters
@@ -173,7 +174,7 @@ export const minifluxServiceHooks: ServiceHooks = {
 
         // get sources that possess ref/id given by service, associate new items
         const sourceMap = new Map<string, RSSSource>()
-        for (let source of Object.values(state.sources)) {
+        for (const source of Object.values(state.sources)) {
             if (source.serviceRef) {
                 sourceMap.set(source.serviceRef, source)
             }
@@ -183,7 +184,7 @@ export const minifluxServiceHooks: ServiceHooks = {
         const parsedItems = items.map(item => {
             const source = sourceMap.get(item.feed.id.toString())
 
-            let parsedItem = {
+            const parsedItem = {
                 source: source.sid,
                 title: item.title,
                 link: item.url,
@@ -200,22 +201,18 @@ export const minifluxServiceHooks: ServiceHooks = {
             } as RSSItem
 
             // Try to get the thumbnail of the item
-            let dom = domParser.parseFromString(item.content, "text/html")
-            let baseEl = dom.createElement("base")
-            baseEl.setAttribute(
-                "href",
-                parsedItem.link.split("/").slice(0, 3).join("/")
-            )
+            const dom = domParser.parseFromString(item.content, "text/html")
+            const baseEl = dom.createElement("base")
+            baseEl.setAttribute("href", parsedItem.link.split("/").slice(0, 3).join("/"))
             dom.head.append(baseEl)
-            let img = dom.querySelector("img")
+            const img = dom.querySelector("img")
             if (img && img.src) parsedItem.thumb = img.src
 
             if (source.rules) {
                 SourceRule.applyAll(source.rules, parsedItem)
                 if ((item.status === "read") !== parsedItem.hasRead)
                     minifluxServiceHooks.markRead(parsedItem)
-                if (item.starred !== parsedItem.starred)
-                    minifluxServiceHooks.markUnread(parsedItem)
+                if (item.starred !== parsedItem.starred) minifluxServiceHooks.markUnread(parsedItem)
             }
 
             return parsedItem
@@ -228,18 +225,13 @@ export const minifluxServiceHooks: ServiceHooks = {
     syncItems: () => async (_, getState) => {
         const configs = getState().service as MinifluxConfigs
 
-        const unreadPromise: Promise<Entries> = fetchAPI(
-            configs,
-            "entries?status=unread"
-        ).then(response => response.json())
-        const starredPromise: Promise<Entries> = fetchAPI(
-            configs,
-            "entries?starred=true"
-        ).then(response => response.json())
-        const [unread, starred] = await Promise.all([
-            unreadPromise,
-            starredPromise,
-        ])
+        const unreadPromise: Promise<Entries> = fetchAPI(configs, "entries?status=unread").then(
+            response => response.json()
+        )
+        const starredPromise: Promise<Entries> = fetchAPI(configs, "entries?starred=true").then(
+            response => response.json()
+        )
+        const [unread, starred] = await Promise.all([unreadPromise, starredPromise])
 
         return [
             new Set(unread.entries.map((entry: Entry) => String(entry.id))),
@@ -272,12 +264,7 @@ export const minifluxServiceHooks: ServiceHooks = {
             "entry_ids": [${item.serviceRef}],
             "status": "unread"
         }`
-        await fetchAPI(
-            getState().service as MinifluxConfigs,
-            "entries",
-            "PUT",
-            body
-        )
+        await fetchAPI(getState().service as MinifluxConfigs, "entries", "PUT", body)
     },
 
     // mark entries for source ids as read, relative to date, determined by "before" bool
@@ -316,11 +303,7 @@ export const minifluxServiceHooks: ServiceHooks = {
             const sources = state.sources
             await Promise.all(
                 sids.map(sid =>
-                    fetchAPI(
-                        configs,
-                        `feeds/${sources[sid]?.serviceRef}/mark-all-as-read`,
-                        "PUT"
-                    )
+                    fetchAPI(configs, `feeds/${sources[sid]?.serviceRef}/mark-all-as-read`, "PUT")
                 )
             )
         }

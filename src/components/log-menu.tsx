@@ -1,12 +1,6 @@
 import * as React from "react"
 import intl from "react-intl-universal"
-import {
-    Callout,
-    ActivityItem,
-    Icon,
-    DirectionalHint,
-    Link,
-} from "@fluentui/react"
+import { Callout, ActivityItem, Icon, DirectionalHint, Link } from "@fluentui/react"
 import { AppLog, AppLogType, toggleLogMenu } from "../scripts/models/app"
 import Time from "./utils/time"
 import { useAppDispatch, useAppSelector } from "../scripts/reducer"
@@ -35,11 +29,10 @@ function LogMenu() {
                 directionalHint={DirectionalHint.bottomCenter}
                 calloutWidth={320}
                 calloutMaxHeight={240}
-                onDismiss={() => dispatch(toggleLogMenu())}>
+                onDismiss={() => dispatch(toggleLogMenu())}
+            >
                 {logs.length == 0 ? (
-                    <p style={{ textAlign: "center" }}>
-                        {intl.get("log.empty")}
-                    </p>
+                    <p style={{ textAlign: "center" }}>{intl.get("log.empty")}</p>
                 ) : (
                     logs
                         .map((l, i) => (
@@ -50,10 +43,9 @@ function LogMenu() {
                                             <Link
                                                 onClick={() => {
                                                     dispatch(toggleLogMenu())
-                                                    dispatch(
-                                                        showItemFromId(l.iid)
-                                                    )
-                                                }}>
+                                                    dispatch(showItemFromId(l.iid))
+                                                }}
+                                            >
                                                 {l.title}
                                             </Link>
                                         </b>

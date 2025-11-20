@@ -1,19 +1,19 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import QRCode from "qrcode.react"
-import {
-    cutText,
-    webSearch,
-    getSearchEngineName,
-    platformCtrl,
-} from "../scripts/utils"
+import { cutText, webSearch, getSearchEngineName, platformCtrl } from "../scripts/utils"
 import {
     ContextualMenu,
     IContextualMenuItem,
     ContextualMenuItemType,
     DirectionalHint,
-} from "office-ui-fabric-react/lib/ContextualMenu"
-import { closeContextMenu, ContextMenuType } from "../scripts/models/app"
+} from "@fluentui/react/lib/ContextualMenu"
+import {
+    closeContextMenu,
+    ContextMenuType,
+    toggleSettings,
+    openTranslationPopup,
+} from "../scripts/models/app"
 import {
     markAllRead,
     markRead,
@@ -21,6 +21,7 @@ import {
     RSSItem,
     toggleHidden,
     toggleStarred,
+    fetchItems,
 } from "../scripts/models/item"
 import { ViewType, ImageCallbackTypes, ViewConfigs } from "../schema-types"
 import { FilterType } from "../scripts/models/feed"
@@ -105,9 +106,7 @@ function ItemContextMenu() {
         },
         {
             key: "markAsRead",
-            text: item.hasRead
-                ? intl.get("article.markUnread")
-                : intl.get("article.markRead"),
+            text: item.hasRead ? intl.get("article.markUnread") : intl.get("article.markRead"),
             iconProps: item.hasRead
                 ? {
                       iconName: "RadioBtnOn",
@@ -126,7 +125,7 @@ function ItemContextMenu() {
                 items: [
                     {
                         key: "markBelow",
-                        text: intl.get("article.markBelow"),
+                        text: intl.get("nav.markBelow"),
                         iconProps: {
                             iconName: "Down",
                             style: { fontSize: 14 },
@@ -137,7 +136,7 @@ function ItemContextMenu() {
                     },
                     {
                         key: "markAbove",
-                        text: intl.get("article.markAbove"),
+                        text: intl.get("nav.markAbove"),
                         iconProps: {
                             iconName: "Up",
                             style: { fontSize: 14 },
@@ -151,9 +150,7 @@ function ItemContextMenu() {
         },
         {
             key: "toggleStarred",
-            text: item.starred
-                ? intl.get("article.unstar")
-                : intl.get("article.star"),
+            text: item.starred ? intl.get("article.unstar") : intl.get("article.star"),
             iconProps: {
                 iconName: item.starred ? "FavoriteStar" : "FavoriteStarFill",
             },
@@ -163,9 +160,7 @@ function ItemContextMenu() {
         },
         {
             key: "toggleHidden",
-            text: item.hidden
-                ? intl.get("article.unhide")
-                : intl.get("article.hide"),
+            text: item.hidden ? intl.get("article.unhide") : intl.get("article.hide"),
             iconProps: {
                 iconName: item.hidden ? "View" : "Hide3",
             },
@@ -214,45 +209,27 @@ function ItemContextMenu() {
                                   key: "showCover",
                                   text: intl.get("context.showCover"),
                                   canCheck: true,
-                                  checked: Boolean(
-                                      viewConfigs & ViewConfigs.ShowCover
-                                  ),
+                                  checked: Boolean(viewConfigs & ViewConfigs.ShowCover),
                                   onClick: () =>
-                                      dispatch(
-                                          setViewConfigs(
-                                              viewConfigs ^
-                                                  ViewConfigs.ShowCover
-                                          )
-                                      ),
+                                      dispatch(setViewConfigs(viewConfigs ^ ViewConfigs.ShowCover)),
                               },
                               {
                                   key: "showSnippet",
                                   text: intl.get("context.showSnippet"),
                                   canCheck: true,
-                                  checked: Boolean(
-                                      viewConfigs & ViewConfigs.ShowSnippet
-                                  ),
+                                  checked: Boolean(viewConfigs & ViewConfigs.ShowSnippet),
                                   onClick: () =>
                                       dispatch(
-                                          setViewConfigs(
-                                              viewConfigs ^
-                                                  ViewConfigs.ShowSnippet
-                                          )
+                                          setViewConfigs(viewConfigs ^ ViewConfigs.ShowSnippet)
                                       ),
                               },
                               {
                                   key: "fadeRead",
                                   text: intl.get("context.fadeRead"),
                                   canCheck: true,
-                                  checked: Boolean(
-                                      viewConfigs & ViewConfigs.FadeRead
-                                  ),
+                                  checked: Boolean(viewConfigs & ViewConfigs.FadeRead),
                                   onClick: () =>
-                                      dispatch(
-                                          setViewConfigs(
-                                              viewConfigs ^ ViewConfigs.FadeRead
-                                          )
-                                      ),
+                                      dispatch(setViewConfigs(viewConfigs ^ ViewConfigs.FadeRead)),
                               },
                           ],
                       },
@@ -264,14 +241,21 @@ function ItemContextMenu() {
 }
 
 function TextContextMenu() {
-    const target = useAppSelector(state => state.app.contextMenu.target) as [
-        string,
-        string
-    ]
-    const text = target[0]
-    const url = target[1]
+    const dispatch = useAppDispatch()
+    const { target, position } = useAppSelector(state => state.app.contextMenu)
+    const [text, url] = target as [string, string]
     const menuItems: IContextualMenuItem[] = text
         ? [
+              {
+                  key: "translate",
+                  text: intl.get("ai.translate"),
+                  iconProps: { iconName: "LocaleLanguage" },
+                  onClick: () => {
+                      if (position && text) {
+                          dispatch(openTranslationPopup(text, position))
+                      }
+                  },
+              },
               {
                   key: "copyText",
                   text: intl.get("context.copy"),
@@ -323,9 +307,7 @@ function ImageContextMenu() {
             iconProps: { iconName: "NavigateExternalInline" },
             onClick: e => {
                 if (platformCtrl(e)) {
-                    window.utils.imageCallback(
-                        ImageCallbackTypes.OpenExternalBg
-                    )
+                    window.utils.imageCallback(ImageCallbackTypes.OpenExternalBg)
                 } else {
                     window.utils.imageCallback(ImageCallbackTypes.OpenExternal)
                 }
@@ -419,11 +401,8 @@ function ViewContextMenu() {
                         text: intl.get("allArticles"),
                         iconProps: { iconName: "ClearFilter" },
                         canCheck: true,
-                        checked:
-                            (filter & ~FilterType.Toggles) ==
-                            FilterType.Default,
-                        onClick: () =>
-                            dispatch(switchFilter(FilterType.Default)),
+                        checked: (filter & ~FilterType.Toggles) == FilterType.Default,
+                        onClick: () => dispatch(switchFilter(FilterType.Default)),
                     },
                     {
                         key: "unreadOnly",
@@ -436,22 +415,16 @@ function ViewContextMenu() {
                             },
                         },
                         canCheck: true,
-                        checked:
-                            (filter & ~FilterType.Toggles) ==
-                            FilterType.UnreadOnly,
-                        onClick: () =>
-                            dispatch(switchFilter(FilterType.UnreadOnly)),
+                        checked: (filter & ~FilterType.Toggles) == FilterType.UnreadOnly,
+                        onClick: () => dispatch(switchFilter(FilterType.UnreadOnly)),
                     },
                     {
                         key: "starredOnly",
                         text: intl.get("context.starredOnly"),
                         iconProps: { iconName: "FavoriteStarFill" },
                         canCheck: true,
-                        checked:
-                            (filter & ~FilterType.Toggles) ==
-                            FilterType.StarredOnly,
-                        onClick: () =>
-                            dispatch(switchFilter(FilterType.StarredOnly)),
+                        checked: (filter & ~FilterType.Toggles) == FilterType.StarredOnly,
+                        onClick: () => dispatch(switchFilter(FilterType.StarredOnly)),
                     },
                 ],
             },
@@ -475,8 +448,7 @@ function ViewContextMenu() {
                         },
                         canCheck: true,
                         checked: !(filter & FilterType.CaseInsensitive),
-                        onClick: () =>
-                            dispatch(toggleFilter(FilterType.CaseInsensitive)),
+                        onClick: () => dispatch(toggleFilter(FilterType.CaseInsensitive)),
                     },
                     {
                         key: "fullSearch",
@@ -484,8 +456,7 @@ function ViewContextMenu() {
                         iconProps: { iconName: "Breadcrumb" },
                         canCheck: true,
                         checked: Boolean(filter & FilterType.FullSearch),
-                        onClick: () =>
-                            dispatch(toggleFilter(FilterType.FullSearch)),
+                        onClick: () => dispatch(toggleFilter(FilterType.FullSearch)),
                     },
                 ],
             },
@@ -503,9 +474,7 @@ function ViewContextMenu() {
 
 function GroupContextMenu() {
     const dispatch = useAppDispatch()
-    const sids = useAppSelector(
-        state => state.app.contextMenu.target
-    ) as number[]
+    const sids = useAppSelector(state => state.app.contextMenu.target) as number[]
 
     const menuItems: IContextualMenuItem[] = [
         {
@@ -521,7 +490,7 @@ function GroupContextMenu() {
             text: intl.get("nav.refresh"),
             iconProps: { iconName: "Sync" },
             onClick: () => {
-                dispatch(markAllRead(sids))
+                dispatch(fetchItems(false, sids))
             },
         },
         {
@@ -529,7 +498,7 @@ function GroupContextMenu() {
             text: intl.get("context.manageSources"),
             iconProps: { iconName: "Settings" },
             onClick: () => {
-                dispatch(markAllRead(sids))
+                dispatch(toggleSettings(true, sids))
             },
         },
     ]
@@ -558,7 +527,7 @@ function MarkReadContextMenu() {
                         key: "1d",
                         text: intl.get("app.daysAgo", { days: 1 }),
                         onClick: () => {
-                            let date = new Date()
+                            const date = new Date()
                             date.setTime(date.getTime() - 86400000)
                             dispatch(markAllRead(null, date))
                         },
@@ -567,7 +536,7 @@ function MarkReadContextMenu() {
                         key: "3d",
                         text: intl.get("app.daysAgo", { days: 3 }),
                         onClick: () => {
-                            let date = new Date()
+                            const date = new Date()
                             date.setTime(date.getTime() - 3 * 86400000)
                             dispatch(markAllRead(null, date))
                         },
@@ -576,7 +545,7 @@ function MarkReadContextMenu() {
                         key: "7d",
                         text: intl.get("app.daysAgo", { days: 7 }),
                         onClick: () => {
-                            let date = new Date()
+                            const date = new Date()
                             date.setTime(date.getTime() - 7 * 86400000)
                             dispatch(markAllRead(null, date))
                         },
@@ -588,9 +557,7 @@ function MarkReadContextMenu() {
     return <ContextMenuBase menuItems={menuItems} />
 }
 
-function ContextMenuBase({
-    menuItems,
-}: Readonly<{ menuItems: IContextualMenuItem[] }>) {
+function ContextMenuBase({ menuItems }: Readonly<{ menuItems: IContextualMenuItem[] }>) {
     const { event, position } = useAppSelector(state => state.app.contextMenu)
     const dispatch = useAppDispatch()
 

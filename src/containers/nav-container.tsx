@@ -1,8 +1,7 @@
-import intl from "react-intl-universal"
 import { connect } from "react-redux"
 import { createSelector } from "reselect"
 import { RootState } from "../scripts/reducer"
-import { fetchItems, markAllRead } from "../scripts/models/item"
+import { fetchItems } from "../scripts/models/item"
 import {
     toggleMenu,
     toggleLogMenu,
@@ -18,13 +17,10 @@ const getState = (state: RootState) => state.app
 const getItemShown = (state: RootState) =>
     state.page.itemId && state.page.viewType !== ViewType.List
 
-const mapStateToProps = createSelector(
-    [getState, getItemShown],
-    (state, itemShown) => ({
-        state: state,
-        itemShown: itemShown,
-    })
-)
+const mapStateToProps = createSelector([getState, getItemShown], (state, itemShown) => ({
+    state: state,
+    itemShown: itemShown,
+}))
 
 const mapDispatchToProps = dispatch => ({
     fetch: () => dispatch(fetchItems()),

@@ -9,6 +9,34 @@ import { domParser } from "../../utils"
 import { RSSItem } from "../item"
 import { SourceRule } from "../rule"
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface NextcloudFeed {
+    id: number
+    url: string
+    title: string
+    folderId?: number
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface NextcloudFolder {
+    id: number
+    name: string
+}
+
+interface NextcloudItem {
+    id: number
+    feedId: number
+    title: string
+    author?: string
+    body: string
+    url: string
+    unread: boolean
+    starred: boolean
+    pubDate: number
+    lastModified: number
+    enclosureLink?: string
+}
+
 export interface NextcloudConfigs extends ServiceConfigs {
     type: SyncService.Nextcloud
     endpoint: string
@@ -21,24 +49,13 @@ export interface NextcloudConfigs extends ServiceConfigs {
 
 async function fetchAPI(configs: NextcloudConfigs, params: string) {
     const headers = new Headers()
-    headers.set(
-        "Authorization",
-        "Basic " + btoa(configs.username + ":" + configs.password)
-    )
+    headers.set("Authorization", "Basic " + btoa(configs.username + ":" + configs.password))
     return await fetch(configs.endpoint + params, { headers: headers })
 }
 
-async function markItems(
-    configs: NextcloudConfigs,
-    type: string,
-    method: string,
-    refs: number[]
-) {
+async function markItems(configs: NextcloudConfigs, type: string, method: string, refs: number[]) {
     const headers = new Headers()
-    headers.set(
-        "Authorization",
-        "Basic " + btoa(configs.username + ":" + configs.password)
-    )
+    headers.set("Authorization", "Basic " + btoa(configs.username + ":" + configs.password))
     headers.set("Content-Type", "application/json; charset=utf-8")
     const promises = new Array<Promise<Response>>()
     while (refs.length > 0) {
@@ -46,8 +63,9 @@ async function markItems(
         while (batch.length < 1000 && refs.length > 0) {
             batch.push(refs.pop())
         }
-        const bodyObject: any = {}
-        bodyObject["itemIds"] = batch
+        const bodyObject: Record<string, number[]> = {
+            itemIds: batch,
+        }
         promises.push(
             fetch(configs.endpoint + "/items/" + type + "/multiple", {
                 method: method,
@@ -77,14 +95,14 @@ export const nextcloudServiceHooks: ServiceHooks = {
         if (response.status !== 200) throw APIError()
         const feeds = await response.json()
         let groupsMap: Map<string, string>
-        let groupsByTagId: Map<string, string> = new Map()
+        const groupsByTagId: Map<string, string> = new Map()
         if (configs.importGroups) {
             const foldersResponse = await fetchAPI(configs, "/folders")
             if (foldersResponse.status !== 200) throw APIError()
             const folders = await foldersResponse.json()
             const foldersSet = new Set<string>()
             groupsMap = new Map()
-            for (let folder of folders.folders) {
+            for (const folder of folders.folders) {
                 const title = folder.name.trim()
                 if (!foldersSet.has(title)) {
                     foldersSet.add(title)
@@ -98,10 +116,7 @@ export const nextcloudServiceHooks: ServiceHooks = {
             source.iconurl = s.faviconLink
             source.serviceRef = String(s.id)
             if (s.folderId && groupsByTagId.has(String(s.folderId))) {
-                groupsMap.set(
-                    String(s.id),
-                    groupsByTagId.get(String(s.folderId))
-                )
+                groupsMap.set(String(s.id), groupsByTagId.get(String(s.folderId)))
             }
             return source
         })
@@ -114,8 +129,7 @@ export const nextcloudServiceHooks: ServiceHooks = {
             fetchAPI(configs, "/items?getRead=false&type=3&batchSize=-1"),
             fetchAPI(configs, "/items?getRead=true&type=2&batchSize=-1"),
         ])
-        if (unreadResponse.status !== 200 || starredResponse.status !== 200)
-            throw APIError()
+        if (unreadResponse.status !== 200 || starredResponse.status !== 200) throw APIError()
         const unread = await unreadResponse.json()
         const starred = await starredResponse.json()
         return [
@@ -127,10 +141,10 @@ export const nextcloudServiceHooks: ServiceHooks = {
     fetchItems: () => async (_, getState) => {
         const state = getState()
         const configs = state.service as NextcloudConfigs
-        let items = new Array()
+        let items = new Array<NextcloudItem>()
         configs.lastModified = configs.lastModified || 0
         configs.lastId = configs.lastId || 0
-        let lastFetched: any
+        let lastFetched: { items: NextcloudItem[] }
 
         if (!configs.lastModified || configs.lastModified == 0) {
             //first sync
@@ -153,26 +167,22 @@ export const nextcloudServiceHooks: ServiceHooks = {
             //incremental sync
             const response = await fetchAPI(
                 configs,
-                "/items/updated?lastModified=" +
-                    configs.lastModified +
-                    "&type=3"
+                "/items/updated?lastModified=" + configs.lastModified + "&type=3"
             )
             if (response.status !== 200) throw APIError()
-            lastFetched = (await response.json()).items
-            items.push(...lastFetched.filter(i => i.id > configs.lastId))
+            const result = (await response.json()) as { items: NextcloudItem[] }
+            lastFetched = result
+            items.push(...result.items.filter(i => i.id > configs.lastId))
         }
         configs.lastModified = items.reduce(
             (m, n) => Math.max(m, n.lastModified),
             configs.lastModified
         )
-        configs.lastId = items.reduce(
-            (m, n) => Math.max(m, n.id),
-            configs.lastId
-        )
+        configs.lastId = items.reduce((m, n) => Math.max(m, n.id), configs.lastId)
         configs.lastModified++ //+1 to avoid fetching articles with same lastModified next time
         if (items.length > 0) {
             const fidMap = new Map<string, RSSSource>()
-            for (let source of Object.values(state.sources)) {
+            for (const source of Object.values(state.sources)) {
                 if (source.serviceRef) {
                     fidMap.set(source.serviceRef, source)
                 }
@@ -203,31 +213,18 @@ export const nextcloudServiceHooks: ServiceHooks = {
                 if (i.enclosureLink) {
                     item.thumb = i.enclosureLink
                 } else {
-                    let baseEl = dom.createElement("base")
-                    baseEl.setAttribute(
-                        "href",
-                        item.link.split("/").slice(0, 3).join("/")
-                    )
+                    const baseEl = dom.createElement("base")
+                    baseEl.setAttribute("href", item.link.split("/").slice(0, 3).join("/"))
                     dom.head.append(baseEl)
-                    let img = dom.querySelector("img")
+                    const img = dom.querySelector("img")
                     if (img && img.src) item.thumb = img.src
                 }
                 // Apply rules and sync back to the service
                 if (source.rules) SourceRule.applyAll(source.rules, item)
                 if (unreadItem && item.hasRead)
-                    markItems(
-                        configs,
-                        item.hasRead ? "read" : "unread",
-                        "POST",
-                        [i.id]
-                    )
+                    markItems(configs, item.hasRead ? "read" : "unread", "POST", [i.id])
                 if (starredItem !== Boolean(item.starred))
-                    markItems(
-                        configs,
-                        item.starred ? "star" : "unstar",
-                        "POST",
-                        [i.id]
-                    )
+                    markItems(configs, item.starred ? "star" : "unstar", "POST", [i.id])
 
                 parsedItems.push(item)
             })
@@ -246,53 +243,35 @@ export const nextcloudServiceHooks: ServiceHooks = {
             db.items.serviceRef.isNotNull(),
         ]
         if (date) {
-            predicates.push(
-                before ? db.items.date.lte(date) : db.items.date.gte(date)
-            )
+            predicates.push(before ? db.items.date.lte(date) : db.items.date.gte(date))
         }
         const query = lf.op.and.apply(null, predicates)
-        const rows = await db.itemsDB
-            .select(db.items.serviceRef)
-            .from(db.items)
-            .where(query)
-            .exec()
+        const rows = await db.itemsDB.select(db.items.serviceRef).from(db.items).where(query).exec()
         const refs = rows.map(row => parseInt(row["serviceRef"]))
         markItems(configs, "unread", "POST", refs)
     },
 
     markRead: (item: RSSItem) => async (_, getState) => {
-        await markItems(
-            getState().service as NextcloudConfigs,
-            "read",
-            "POST",
-            [parseInt(item.serviceRef)]
-        )
+        await markItems(getState().service as NextcloudConfigs, "read", "POST", [
+            parseInt(item.serviceRef),
+        ])
     },
 
     markUnread: (item: RSSItem) => async (_, getState) => {
-        await markItems(
-            getState().service as NextcloudConfigs,
-            "unread",
-            "POST",
-            [parseInt(item.serviceRef)]
-        )
+        await markItems(getState().service as NextcloudConfigs, "unread", "POST", [
+            parseInt(item.serviceRef),
+        ])
     },
 
     star: (item: RSSItem) => async (_, getState) => {
-        await markItems(
-            getState().service as NextcloudConfigs,
-            "star",
-            "POST",
-            [parseInt(item.serviceRef)]
-        )
+        await markItems(getState().service as NextcloudConfigs, "star", "POST", [
+            parseInt(item.serviceRef),
+        ])
     },
 
     unstar: (item: RSSItem) => async (_, getState) => {
-        await markItems(
-            getState().service as NextcloudConfigs,
-            "unstar",
-            "POST",
-            [parseInt(item.serviceRef)]
-        )
+        await markItems(getState().service as NextcloudConfigs, "unstar", "POST", [
+            parseInt(item.serviceRef),
+        ])
     },
 }

@@ -7,6 +7,7 @@ import {
     initFeeds,
     FeedActionTypes,
     INIT_FEED,
+    STARRED,
 } from "./feed"
 import { getWindowBreakpoint, AppThunk, ActionStatus } from "../utils"
 import { RSSItem, markRead } from "./item"
@@ -27,6 +28,7 @@ export enum PageType {
     AllArticles,
     Sources,
     Page,
+    Starred,
 }
 
 interface SelectPageAction {
@@ -77,8 +79,23 @@ export type PageActionTypes =
     | ToggleSearchAction
     | SetViewConfigsAction
 
+export const applyFilterDone = (filter: FeedFilter): PageActionTypes => ({
+    type: APPLY_FILTER,
+    filter: filter,
+})
+
 export function selectAllArticles(init = false): AppThunk {
     return (dispatch, getState) => {
+        const filter = getState().page.filter
+        const savedType = window.settings.getFilterType()
+        if (filter.type !== savedType) {
+            dispatch(
+                applyFilterDone({
+                    ...filter,
+                    type: savedType,
+                })
+            )
+        }
         dispatch({
             type: SELECT_PAGE,
             keepMenu: getWindowBreakpoint(),
@@ -89,12 +106,40 @@ export function selectAllArticles(init = false): AppThunk {
     }
 }
 
-export function selectSources(
-    sids: number[],
-    menuKey: string,
-    title: string
-): AppThunk {
+export function selectStarred(init = false): AppThunk {
     return (dispatch, getState) => {
+        const filter = getState().page.filter
+        const newType = FilterType.StarredOnly | (filter.type & FilterType.Toggles)
+        if (filter.type !== newType) {
+            dispatch(
+                applyFilterDone({
+                    ...filter,
+                    type: newType,
+                })
+            )
+        }
+        dispatch({
+            type: SELECT_PAGE,
+            keepMenu: getWindowBreakpoint(),
+            filter: getState().page.filter,
+            pageType: PageType.Starred,
+            init: init,
+        } as PageActionTypes)
+    }
+}
+
+export function selectSources(sids: number[], menuKey: string, title: string): AppThunk {
+    return (dispatch, getState) => {
+        const filter = getState().page.filter
+        const savedType = window.settings.getFilterType()
+        if (filter.type !== savedType) {
+            dispatch(
+                applyFilterDone({
+                    ...filter,
+                    type: savedType,
+                })
+            )
+        }
         if (getState().app.menuKey !== menuKey) {
             dispatch({
                 type: SELECT_PAGE,
@@ -131,8 +176,8 @@ export function showItem(feedId: string, item: RSSItem): AppThunk {
     return (dispatch, getState) => {
         const state = getState()
         if (
-            state.items.hasOwnProperty(item._id) &&
-            state.sources.hasOwnProperty(item.source)
+            Object.prototype.hasOwnProperty.call(state.items, item._id) &&
+            Object.prototype.hasOwnProperty.call(state.sources, item.source)
         ) {
             dispatch({
                 type: SHOW_ITEM,
@@ -155,7 +200,7 @@ export const dismissItem = (): PageActionTypes => ({ type: DISMISS_ITEM })
 
 export const toggleSearch = (): AppThunk => {
     return (dispatch, getState) => {
-        let state = getState()
+        const state = getState()
         dispatch({ type: TOGGLE_SEARCH })
         if (!getWindowBreakpoint() && state.app.menu) {
             dispatch(toggleMenu())
@@ -173,20 +218,18 @@ export const toggleSearch = (): AppThunk => {
 
 export function showOffsetItem(offset: number): AppThunk {
     return (dispatch, getState) => {
-        let state = getState()
+        const state = getState()
         if (!state.page.itemFromFeed) return
-        let [itemId, feedId] = [state.page.itemId, state.page.feedId]
-        let feed = state.feeds[feedId]
-        let iids = feed.iids
-        let itemIndex = iids.indexOf(itemId)
+        const [itemId, feedId] = [state.page.itemId, state.page.feedId]
+        const feed = state.feeds[feedId]
+        const iids = feed.iids
+        const itemIndex = iids.indexOf(itemId)
         let newIndex = itemIndex + offset
         if (itemIndex < 0) {
-            let item = state.items[itemId]
-            let prevs = feed.iids
-                .map(
-                    (id, index) => [state.items[id], index] as [RSSItem, number]
-                )
-                .filter(([i, _]) => i.date > item.date)
+            const item = state.items[itemId]
+            const prevs = feed.iids
+                .map((id, index) => [state.items[id], index] as [RSSItem, number])
+                .filter(([i]) => i.date > item.date)
             if (prevs.length > 0) {
                 let prev = prevs[0]
                 for (let j = 1; j < prevs.length; j += 1) {
@@ -199,7 +242,7 @@ export function showOffsetItem(offset: number): AppThunk {
         }
         if (newIndex >= 0) {
             if (newIndex < iids.length) {
-                let item = state.items[iids[newIndex]]
+                const item = state.items[iids[newIndex]]
                 dispatch(markRead(item))
                 dispatch(showItem(feedId, item))
                 return
@@ -216,16 +259,13 @@ export function showOffsetItem(offset: number): AppThunk {
     }
 }
 
-const applyFilterDone = (filter: FeedFilter): PageActionTypes => ({
-    type: APPLY_FILTER,
-    filter: filter,
-})
-
 function applyFilter(filter: FeedFilter): AppThunk {
     return (dispatch, getState) => {
+        if (getState().app.menuKey === STARRED) {
+            filter.type &= ~FilterType.ShowNotStarred
+        }
         const oldFilterType = getState().page.filter.type
-        if (filter.type !== oldFilterType)
-            window.settings.setFilterType(filter.type)
+        if (filter.type !== oldFilterType) window.settings.setFilterType(filter.type)
         dispatch(applyFilterDone(filter))
         dispatch(initFeeds(true))
     }
@@ -233,9 +273,9 @@ function applyFilter(filter: FeedFilter): AppThunk {
 
 export function switchFilter(filter: FilterType): AppThunk {
     return (dispatch, getState) => {
-        let oldFilter = getState().page.filter
-        let oldType = oldFilter.type
-        let newType = filter | (oldType & FilterType.Toggles)
+        const oldFilter = getState().page.filter
+        const oldType = oldFilter.type
+        const newType = filter | (oldType & FilterType.Toggles)
         if (oldType != newType) {
             dispatch(
                 applyFilter({
@@ -249,7 +289,7 @@ export function switchFilter(filter: FilterType): AppThunk {
 
 export function toggleFilter(filter: FilterType): AppThunk {
     return (dispatch, getState) => {
-        let nextFilter = { ...getState().page.filter }
+        const nextFilter = { ...getState().page.filter }
         nextFilter.type ^= filter
         dispatch(applyFilter(nextFilter))
     }
@@ -257,7 +297,7 @@ export function toggleFilter(filter: FilterType): AppThunk {
 
 export function performSearch(query: string): AppThunk {
     return (dispatch, getState) => {
-        let state = getState()
+        const state = getState()
         if (state.page.searchOn) {
             dispatch(
                 applyFilter({
@@ -271,9 +311,7 @@ export function performSearch(query: string): AppThunk {
 
 export class PageState {
     viewType = window.settings.getDefaultView()
-    viewConfigs = window.settings.getViewConfigs(
-        window.settings.getDefaultView()
-    )
+    viewConfigs = window.settings.getViewConfigs(window.settings.getDefaultView())
     filter = new FeedFilter()
     feedId = ALL
     itemId = null as number
@@ -289,6 +327,12 @@ export function pageReducer(
         case SELECT_PAGE:
             switch (action.pageType) {
                 case PageType.AllArticles:
+                    return {
+                        ...state,
+                        feedId: ALL,
+                        itemId: null,
+                    }
+                case PageType.Starred:
                     return {
                         ...state,
                         feedId: ALL,
@@ -333,8 +377,7 @@ export function pageReducer(
                         ...state,
                         itemId:
                             action.feed._id === state.feedId &&
-                            action.items.filter(i => i._id === state.itemId)
-                                .length === 0
+                            action.items.filter(i => i._id === state.itemId).length === 0
                                 ? null
                                 : state.itemId,
                     }

@@ -29,11 +29,7 @@ export interface ServiceHooks {
     syncItems?: () => AppThunk<Promise<[Set<string>, Set<string>]>>
     markRead?: (item: RSSItem) => AppThunk
     markUnread?: (item: RSSItem) => AppThunk
-    markAllRead?: (
-        sids?: number[],
-        date?: Date,
-        before?: boolean
-    ) => AppThunk<Promise<void>>
+    markAllRead?: (sids?: number[], date?: Date, before?: boolean) => AppThunk<Promise<void>>
     star?: (item: RSSItem) => AppThunk
     unstar?: (item: RSSItem) => AppThunk
 }
@@ -80,7 +76,7 @@ export function syncWithService(background = false): AppThunk<Promise<void>> {
                     status: ActionStatus.Success,
                 })
             } catch (err) {
-                console.log(err)
+                console.error(err)
                 dispatch({
                     type: SYNC_SERVICE,
                     status: ActionStatus.Failure,
@@ -103,13 +99,11 @@ function reauthenticate(hooks: ServiceHooks): AppThunk<Promise<void>> {
     }
 }
 
-function updateSources(
-    hook: ServiceHooks["updateSources"]
-): AppThunk<Promise<void>> {
+function updateSources(hook: ServiceHooks["updateSources"]): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
         const [sources, groupsMap] = await dispatch(hook())
         const existing = new Map<string, RSSSource>()
-        for (let source of Object.values(getState().sources)) {
+        for (const source of Object.values(getState().sources)) {
             if (source.serviceRef) {
                 existing.set(source.serviceRef, source)
             }
@@ -117,7 +111,7 @@ function updateSources(
         const forceSettings = () => {
             if (!getState().app.settings.saving) dispatch(saveSettings())
         }
-        let promises = sources.map(async s => {
+        const promises = sources.map(async s => {
             if (existing.has(s.serviceRef)) {
                 const doc = existing.get(s.serviceRef)
                 existing.delete(s.serviceRef)
@@ -155,20 +149,18 @@ function updateSources(
                 }
             }
         })
-        for (let [_, source] of existing) {
+        for (const [, source] of existing) {
             // Delete sources removed from the service side
             forceSettings()
             promises.push(dispatch(deleteSource(source, true)).then(() => null))
         }
-        let sourcesResults = (await Promise.all(promises)).filter(s => s)
+        const sourcesResults = (await Promise.all(promises)).filter(s => s)
         if (groupsMap) {
             // Add sources to imported groups
             forceSettings()
-            for (let source of sourcesResults) {
+            for (const source of sourcesResults) {
                 if (groupsMap.has(source.serviceRef)) {
-                    const gid = dispatch(
-                        createSourceGroup(groupsMap.get(source.serviceRef))
-                    )
+                    const gid = dispatch(createSourceGroup(groupsMap.get(source.serviceRef)))
                     dispatch(addSourceToGroup(gid, source.sid))
                 }
             }
@@ -180,8 +172,7 @@ function updateSources(
 }
 
 function syncItems(hook: ServiceHooks["syncItems"]): AppThunk<Promise<void>> {
-    return async (dispatch, getState) => {
-        const state = getState()
+    return async dispatch => {
         const [unreadRefs, starredRefs] = await dispatch(hook())
         const unreadCopy = new Set(unreadRefs)
         const starredCopy = new Set(starredRefs)
@@ -191,15 +182,12 @@ function syncItems(hook: ServiceHooks["syncItems"]): AppThunk<Promise<void>> {
             .where(
                 lf.op.and(
                     db.items.serviceRef.isNotNull(),
-                    lf.op.or(
-                        db.items.hasRead.eq(false),
-                        db.items.starred.eq(true)
-                    )
+                    lf.op.or(db.items.hasRead.eq(false), db.items.starred.eq(true))
                 )
             )
             .exec()
         const updates = new Array<lf.query.Update>()
-        for (let row of rows) {
+        for (const row of rows) {
             const serviceRef = row["serviceRef"]
             if (row["hasRead"] === false && !unreadRefs.delete(serviceRef)) {
                 updates.push(
@@ -218,7 +206,7 @@ function syncItems(hook: ServiceHooks["syncItems"]): AppThunk<Promise<void>> {
                 )
             }
         }
-        for (let unread of unreadRefs) {
+        for (const unread of unreadRefs) {
             updates.push(
                 db.itemsDB
                     .update(db.items)
@@ -226,7 +214,7 @@ function syncItems(hook: ServiceHooks["syncItems"]): AppThunk<Promise<void>> {
                     .where(db.items.serviceRef.eq(unread))
             )
         }
-        for (let starred of starredRefs) {
+        for (const starred of starredRefs) {
             updates.push(
                 db.itemsDB
                     .update(db.items)
@@ -252,7 +240,7 @@ function fetchItems(
             const inserted = await insertItems(items)
             dispatch(fetchItemsSuccess(inserted.reverse(), getState().items))
             if (background) {
-                for (let item of inserted) {
+                for (const item of inserted) {
                     if (item.notify) dispatch(pushNotification(item))
                 }
                 if (inserted.length > 0) window.utils.requestAttention()
@@ -325,10 +313,7 @@ export function saveServiceConfigs(configs: ServiceConfigs): AppThunk {
     }
 }
 
-function syncLocalItems(
-    unread: Set<string>,
-    starred: Set<string>
-): ServiceActionTypes {
+function syncLocalItems(unread: Set<string>, starred: Set<string>): ServiceActionTypes {
     return {
         type: SYNC_LOCAL_ITEMS,
         unreadIds: unread,
