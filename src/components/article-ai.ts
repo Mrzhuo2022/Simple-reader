@@ -230,6 +230,7 @@ export class ArticleAIHandler {
                     baseUrl: aiConfigs.baseUrl,
                     apiKey: aiConfigs.apiKey,
                     defaultModel: aiConfigs.defaultModel,
+                    prompts: aiConfigs.prompts,
                 },
                 fullTextResult.content,
                 controller.signal

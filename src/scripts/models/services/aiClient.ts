@@ -159,12 +159,17 @@ export async function summarizeArticle(
     const defaultPrompt = isZh
         ? "你是一个专业的 RSS 文章摘要助手。请用简洁的中文总结文章的核心要点，保持客观准确，不要编造文中没有的信息。摘要应该在 3-5 句话之内。"
         : "You are a professional article summarizer. Summarize the key points of the article concisely and objectively, without inventing information not present in the text. Keep the summary to 3-5 sentences."
+
+    const hasCustomPrompt = Boolean(config.prompts?.summary)
     const systemPrompt = config.prompts?.summary || defaultPrompt
 
-    // Use a language-neutral user wrapper so a user-supplied custom prompt is
-    // not polluted by a Chinese prefix when summarizing English articles.
+    // The user wrapper must stay language-neutral. When a custom prompt is
+    // set we must not bias the output language from the user wrapper — the
+    // custom prompt is the sole authority on language/style. Use a plain
+    // label that works in either language.
     const userContent = capContentForSummary(content)
-    const userMessage = `${isZh ? "文章内容" : "Article"}:\n\n${userContent}`
+    const userLabel = hasCustomPrompt ? "Content" : isZh ? "文章内容" : "Article"
+    const userMessage = `${userLabel}:\n\n${userContent}`
 
     return await chatCompletion(
         config,

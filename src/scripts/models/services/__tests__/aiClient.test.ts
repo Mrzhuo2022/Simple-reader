@@ -147,6 +147,32 @@ describe("aiClient", () => {
             expect(body.messages[1].content.length).toBeLessThan(longContent.length)
             expect(body.messages[1].content).toContain("截断")
         })
+
+        it("should honor a custom summary prompt even for English content", async () => {
+            const mockResponse = {
+                choices: [{ message: { content: "中文摘要" } }],
+            }
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => mockResponse,
+            })
+
+            const configWithPrompt: AiConfig = {
+                ...mockConfig,
+                prompts: { summary: "请始终用中文总结文章。" },
+            }
+            await summarizeArticle(configWithPrompt, "An English article about technology.")
+
+            const lastCall = (global.fetch as jest.Mock).mock.calls[0]
+            const body = JSON.parse(lastCall[1].body)
+            // The custom prompt must be passed through as the system message
+            expect(body.messages[0].content).toBe("请始终用中文总结文章。")
+            // The user wrapper must be the neutral "Content" label, not the
+            // English default prompt and not an English-biased label
+            expect(body.messages[1].content).toContain("Content:")
+            expect(body.messages[1].content).not.toContain("Article:")
+            expect(body.messages[1].content).toContain("An English article about technology.")
+        })
     })
 
     describe("translateText", () => {
