@@ -20,7 +20,7 @@
     "test": "jest",
     "package-win": "electron-builder -w --x64 -p never && electron-builder -w --ia32 -p never",
     "package-win-ci": "electron-builder -w --x64 -p never",
-    "package-mac": "electron-builder --mac --x64",
+    "package-mac": "electron-builder --mac --x64 -p never",
     "package-linux": "electron-builder --linux --x64 -p never"
   },
   "keywords": [],

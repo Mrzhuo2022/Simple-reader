@@ -16,20 +16,20 @@ jobs:
             matrix:
                 include:
                     - os: windows-latest
-                      asset_path: "./bin/win32/x64/Simple Reader-win32-x64.zip"
-                      asset_name_prefix: Simple.Reader
-                      asset_ext: win-x64.zip
+                      out_dir: ./bin/win32/x64
+                      artifact_glob: "*.zip"
                       package_script: package-win-ci
+                      release_suffix: win-x64.zip
                     - os: macos-latest
-                      asset_path: "./bin/mac/x64"
-                      asset_name_prefix: Simple.Reader
-                      asset_ext: mac-x64.dmg
+                      out_dir: ./bin/mac/x64
+                      artifact_glob: "*.dmg"
                       package_script: package-mac
+                      release_suffix: mac-x64.dmg
                     - os: ubuntu-latest
-                      asset_path: "./bin/linux/x64"
-                      asset_name_prefix: Simple.Reader
-                      asset_ext: linux-x64.AppImage
+                      out_dir: ./bin/linux/x64
+                      artifact_glob: "*.AppImage"
                       package_script: package-linux
+                      release_suffix: linux-x64.AppImage
         runs-on: ${{ matrix.os }}
 
         steps:
@@ -62,35 +62,32 @@ jobs:
             - name: Package
               run: pnpm run ${{ matrix.package_script }}
               env:
-                  # electron-builder publishes to GitHub if GH_TOKEN is set;
-                  # we only want local packaging (-p never is already in the
-                  # scripts), but keep the token absent to be safe.
+                  # Make sure electron-builder never tries to auto-publish to
+                  # GitHub releases during packaging (every package script
+                  # also passes -p never, but keep GH_TOKEN unset as a guard).
                   GH_TOKEN: ""
 
-            # Resolve the built artifact path (electron-builder output naming
-            # differs per platform; the glob below picks the right file).
+            # Find the built artifact by glob in electron-builder's output dir.
+            # We don't hardcode the filename because electron-builder's naming
+            # (productName-version-arch.ext) varies and has changed across
+            # versions; globbing the extension is robust.
             - name: Resolve artifact
               id: artifact
               shell: bash
               run: |
                   set -eu
-                  if [ "${{ matrix.os }}" = "windows-latest" ]; then
-                      ARTIFACT="${{ matrix.asset_path }}"
-                  else
-                      # Pick the newest matching file in the output dir
-                      EXT="${{ matrix.asset_ext }}"
-                      ARTIFACT=$(ls -t "${{ matrix.asset_path }}"/*."${EXT##*.}" 2>/dev/null | head -1 || true)
-                      case "${{ matrix.asset_ext }}" in
-                          mac-x64.dmg) ARTIFACT=$(ls -t "${{ matrix.asset_path }}"/*.dmg 2>/dev/null | head -1) ;;
-                          linux-x64.AppImage) ARTIFACT=$(ls -t "${{ matrix.asset_path }}"/*.AppImage 2>/dev/null | head -1) ;;
-                      esac
-                  fi
-                  if [ -z "${ARTIFACT:-}" ] || [ ! -f "$ARTIFACT" ]; then
-                      echo "::error::No artifact found in ${{ matrix.asset_path }}"
+                  # shell glob below is intentionally unquoted
+                  shopt -s nullglob
+                  mapfile -t matches < <(ls -t ${{ matrix.out_dir }}/${{ matrix.artifact_glob }} 2>/dev/null)
+                  if [ ${#matches[@]} -eq 0 ]; then
+                      echo "::error::No ${{ matrix.artifact_glob }} found in ${{ matrix.out_dir }}"
+                      ls -la ${{ matrix.out_dir }} || true
                       exit 1
                   fi
+                  ARTIFACT="${matches[0]}"
+                  echo "Found artifact: $ARTIFACT"
                   echo "path=$ARTIFACT" >> "$GITHUB_OUTPUT"
-                  echo "name=${{ matrix.asset_name_prefix }}.${{ steps.version.outputs.version }}.${{ matrix.asset_ext }}" >> "$GITHUB_OUTPUT"
+                  echo "suffix=${{ matrix.release_suffix }}" >> "$GITHUB_OUTPUT"
 
             - name: Upload artifact
               uses: actions/upload-artifact@v4
