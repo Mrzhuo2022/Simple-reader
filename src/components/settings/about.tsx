@@ -13,7 +13,10 @@ class AboutTab extends React.Component {
                 <small>
                     {intl.get("settings.version")} {window.utils.getVersion()}
                 </small>
-                <p className="settings-hint">Copyright © 2025 Evarle Zhuo. All rights reserved.</p>
+                <p className="settings-hint">
+                    Copyright © {new Date().getFullYear()} Evarle Zhuo. All rights
+                    reserved.
+                </p>
                 <p className="settings-hint" style={{ marginTop: -12 }}>
                     Based on{" "}
                     <Link

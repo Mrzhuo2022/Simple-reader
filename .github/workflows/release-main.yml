@@ -1,13 +1,36 @@
-name: CI/CD Release
+name: Release
 
 on:
     push:
         tags:
             - "v*"
 
+permissions:
+    contents: write
+
 jobs:
-    release:
-        runs-on: windows-latest
+    build:
+        name: Build (${{ matrix.os }})
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - os: windows-latest
+                      asset_path: "./bin/win32/x64/Simple Reader-win32-x64.zip"
+                      asset_name_prefix: Simple.Reader
+                      asset_ext: win-x64.zip
+                      package_script: package-win-ci
+                    - os: macos-latest
+                      asset_path: "./bin/mac/x64"
+                      asset_name_prefix: Simple.Reader
+                      asset_ext: mac-x64.dmg
+                      package_script: package-mac
+                    - os: ubuntu-latest
+                      asset_path: "./bin/linux/x64"
+                      asset_name_prefix: Simple.Reader
+                      asset_ext: linux-x64.AppImage
+                      package_script: package-linux
+        runs-on: ${{ matrix.os }}
 
         steps:
             - uses: actions/checkout@v4
@@ -23,124 +46,104 @@ jobs:
                   node-version: "20"
                   cache: "pnpm"
 
-            - name: Build and package the app
-              run: |
-                  pnpm install
-                  pnpm run build
-                  pnpm run package-win-ci
-
-            - name: Get app version
-              id: package-version
-              run: |
-                  PACKAGE_VERSION=$(cat package.json | grep version | head -1 | awk -F: '{ print $2 }' | sed 's/[",]//g' | tr -d '[[:space:]]')
-                  echo ::set-output name=current-version::$PACKAGE_VERSION
+            - name: Read app version
+              id: version
               shell: bash
+              run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-            - name: Create release
-              id: create_release
-              uses: actions/create-release@v1
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+
+            - name: Build
+              run: pnpm run build
+
+            - name: Package
+              run: pnpm run ${{ matrix.package_script }}
               env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  tag_name: ${{ github.ref }}
-                  release_name: Simple Reader v${{ steps.package-version.outputs.current-version }}
-                  draft: true
-                  prerelease: false
+                  # electron-builder publishes to GitHub if GH_TOKEN is set;
+                  # we only want local packaging (-p never is already in the
+                  # scripts), but keep the token absent to be safe.
+                  GH_TOKEN: ""
 
-            - name: Upload win-x64 zip to release assets
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              with:
-                  upload_url: ${{ steps.create_release.outputs.upload_url }}
-                  asset_path: "./bin/win32/x64/Simple Reader-win32-x64.zip"
-                  asset_name: Simple.Reader.${{ steps.package-version.outputs.current-version }}.win-x64.zip
-                  asset_content_type: application/zip
-
-    release-mac:
-        needs: release
-        runs-on: macos-latest
-
-        steps:
-            - uses: actions/checkout@v4
-
-            - name: Setup pnpm
-              uses: pnpm/action-setup@v4
-              with:
-                  version: 10
-
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
-                  cache: "pnpm"
-
-            - name: Build and package the app (macOS)
+            # Resolve the built artifact path (electron-builder output naming
+            # differs per platform; the glob below picks the right file).
+            - name: Resolve artifact
+              id: artifact
+              shell: bash
               run: |
-                  pnpm install
-                  pnpm run build
-                  pnpm run package-mac
+                  set -eu
+                  if [ "${{ matrix.os }}" = "windows-latest" ]; then
+                      ARTIFACT="${{ matrix.asset_path }}"
+                  else
+                      # Pick the newest matching file in the output dir
+                      EXT="${{ matrix.asset_ext }}"
+                      ARTIFACT=$(ls -t "${{ matrix.asset_path }}"/*."${EXT##*.}" 2>/dev/null | head -1 || true)
+                      case "${{ matrix.asset_ext }}" in
+                          mac-x64.dmg) ARTIFACT=$(ls -t "${{ matrix.asset_path }}"/*.dmg 2>/dev/null | head -1) ;;
+                          linux-x64.AppImage) ARTIFACT=$(ls -t "${{ matrix.asset_path }}"/*.AppImage 2>/dev/null | head -1) ;;
+                      esac
+                  fi
+                  if [ -z "${ARTIFACT:-}" ] || [ ! -f "$ARTIFACT" ]; then
+                      echo "::error::No artifact found in ${{ matrix.asset_path }}"
+                      exit 1
+                  fi
+                  echo "path=$ARTIFACT" >> "$GITHUB_OUTPUT"
+                  echo "name=${{ matrix.asset_name_prefix }}.${{ steps.version.outputs.version }}.${{ matrix.asset_ext }}" >> "$GITHUB_OUTPUT"
 
-            - name: Get app version
-              id: package-version
-              uses: martinbeentjes/npm-get-version-action@master
-
-            - name: Get release
-              id: get_release
-              uses: bruceadams/get-release@v1.2.0
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Upload macOS dmg to release assets
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
               with:
-                  upload_url: ${{ steps.get_release.outputs.upload_url }}
-                  asset_path: "./bin/mac/x64/Simple Reader-${{ steps.package-version.outputs.current-version }}.dmg"
-                  asset_name: Simple.Reader.${{ steps.package-version.outputs.current-version }}.mac-x64.dmg
-                  asset_content_type: application/x-apple-diskimage
+                  name: build-${{ matrix.os }}
+                  path: ${{ steps.artifact.outputs.path }}
+                  if-no-files-found: error
 
-    release-linux:
-        needs: release
+    release:
+        name: Publish release
+        needs: build
         runs-on: ubuntu-latest
 
         steps:
             - uses: actions/checkout@v4
 
-            - name: Setup pnpm
-              uses: pnpm/action-setup@v4
-              with:
-                  version: 10
+            - name: Read app version
+              id: version
+              shell: bash
+              run: echo "version=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
+            - name: Download all artifacts
+              uses: actions/download-artifact@v4
               with:
-                  node-version: "20"
-                  cache: "pnpm"
+                  path: assets
+                  merge-multiple: true
 
-            - name: Build and package the app (Linux)
+            - name: List artifacts
+              shell: bash
+              run: ls -la assets
+
+            - name: Rename artifacts
+              shell: bash
               run: |
-                  pnpm install
-                  pnpm run build
-                  pnpm run package-linux
+                  set -eu
+                  VERSION="${{ steps.version.outputs.version }}"
+                  cd assets
+                  # Rename each downloaded file to the canonical release name.
+                  for f in *; do
+                      case "$f" in
+                          *.zip) mv -v "$f" "Simple.Reader.${VERSION}.win-x64.zip" ;;
+                          *.dmg) mv -v "$f" "Simple.Reader.${VERSION}.mac-x64.dmg" ;;
+                          *.AppImage) mv -v "$f" "Simple.Reader.${VERSION}.linux-x64.AppImage" ;;
+                      esac
+                  done
 
-            - name: Get app version
-              id: package-version
-              uses: martinbeentjes/npm-get-version-action@master
-
-            - name: Get release
-              id: get_release
-              uses: bruceadams/get-release@v1.2.0
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Upload Linux AppImage to release assets
-              uses: actions/upload-release-asset@v1
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            - name: Create GitHub release
+              uses: softprops/action-gh-release@v2
               with:
-                  upload_url: ${{ steps.get_release.outputs.upload_url }}
-                  asset_path: "./bin/linux/x64/Simple Reader-${{ steps.package-version.outputs.current-version }}.AppImage"
-                  asset_name: Simple.Reader.${{ steps.package-version.outputs.current-version }}.linux-x64.AppImage
-                  asset_content_type: application/octet-stream
+                  name: Simple Reader v${{ steps.version.outputs.version }}
+                  tag_name: ${{ github.ref_name }}
+                  draft: true
+                  prerelease: false
+                  generate_release_notes: true
+                  files: |
+                      assets/*
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
