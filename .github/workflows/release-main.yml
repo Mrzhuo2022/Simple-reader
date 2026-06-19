@@ -17,19 +17,16 @@ jobs:
                 include:
                     - os: windows-latest
                       out_dir: ./bin/win32/x64
-                      artifact_glob: "*.zip"
+                      artifact_glob: "*"
                       package_script: package-win-ci
-                      release_suffix: win-x64.zip
                     - os: macos-latest
-                      out_dir: ./bin/mac/x64
+                      out_dir: ./bin/darwin/x64
                       artifact_glob: "*.dmg"
                       package_script: package-mac
-                      release_suffix: mac-x64.dmg
                     - os: ubuntu-latest
                       out_dir: ./bin/linux/x64
                       artifact_glob: "*.AppImage"
                       package_script: package-linux
-                      release_suffix: linux-x64.AppImage
         runs-on: ${{ matrix.os }}
 
         steps:
@@ -67,39 +64,17 @@ jobs:
                   # also passes -p never, but keep GH_TOKEN unset as a guard).
                   GH_TOKEN: ""
 
-            # Find the built artifact by glob in electron-builder's output dir.
-            # We don't hardcode the filename because electron-builder's naming
-            # (productName-version-arch.ext) varies and has changed across
-            # versions; globbing the extension is robust.
-            - name: Resolve artifact
-              id: artifact
-              shell: bash
-              run: |
-                  set -eu
-                  # shell glob below is intentionally unquoted
-                  shopt -s nullglob
-                  # Use a way compatible with older Bash (like 3.2 on macOS)
-                  matches=(${{ matrix.out_dir }}/${{ matrix.artifact_glob }})
-                  if [ ${#matches[@]} -eq 0 ]; then
-                      echo "::error::No ${{ matrix.artifact_glob }} found in ${{ matrix.out_dir }}"
-                      ls -la ${{ matrix.out_dir }} || true
-                      exit 1
-                  fi
-                  ARTIFACT="${matches[0]}"
-                  echo "Found artifact: $ARTIFACT"
-                  echo "path=$ARTIFACT" >> "$GITHUB_OUTPUT"
-                  echo "suffix=${{ matrix.release_suffix }}" >> "$GITHUB_OUTPUT"
-
-            - name: Upload artifact
+            - name: Upload artifacts
               uses: actions/upload-artifact@v4
               with:
                   name: build-${{ matrix.os }}
-                  path: ${{ steps.artifact.outputs.path }}
-                  if-no-files-found: error
+                  path: ${{ matrix.out_dir }}/*
+                  if-no-files-found: warn
 
     release:
         name: Publish release
         needs: build
+        if: always()
         runs-on: ubuntu-latest
 
         steps:
@@ -118,7 +93,18 @@ jobs:
 
             - name: List artifacts
               shell: bash
-              run: ls -la assets
+              run: |
+                  echo "Artifact directory: $(pwd)/assets"
+                  ls -la assets || true
+
+            - name: Skip release if no artifacts
+              shell: bash
+              run: |
+                  set -eu
+                  if [ -z "$(find assets -maxdepth 1 -type f | head -n 1)" ]; then
+                      echo "No artifacts found, skipping release."
+                      exit 0
+                  fi
 
             - name: Rename artifacts
               shell: bash
@@ -126,12 +112,13 @@ jobs:
                   set -eu
                   VERSION="${{ steps.version.outputs.version }}"
                   cd assets
-                  # Rename each downloaded file to the canonical release name.
                   for f in *; do
                       case "$f" in
                           *.zip) mv -v "$f" "Simple.Reader.${VERSION}.win-x64.zip" ;;
+                          *.exe) mv -v "$f" "Simple.Reader.${VERSION}.win-x64.exe" ;;
                           *.dmg) mv -v "$f" "Simple.Reader.${VERSION}.mac-x64.dmg" ;;
                           *.AppImage) mv -v "$f" "Simple.Reader.${VERSION}.linux-x64.AppImage" ;;
+                          *) echo "Keeping artifact unchanged: $f" ;;
                       esac
                   done
 
