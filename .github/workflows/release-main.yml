@@ -78,7 +78,6 @@ jobs:
     release:
         name: Publish release
         needs: build
-        if: always()
         runs-on: ubuntu-latest
 
         steps:
