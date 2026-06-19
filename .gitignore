@@ -8,6 +8,7 @@ dist/*.LICENSE.txt
 
 # Electron-builder / installer outputs
 bin/
+*.blockmap
 
 # Logs
 npm-debug.log*
