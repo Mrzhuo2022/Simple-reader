@@ -78,7 +78,8 @@ jobs:
                   set -eu
                   # shell glob below is intentionally unquoted
                   shopt -s nullglob
-                  mapfile -t matches < <(ls -t ${{ matrix.out_dir }}/${{ matrix.artifact_glob }} 2>/dev/null)
+                  # Use a way compatible with older Bash (like 3.2 on macOS)
+                  matches=(${{ matrix.out_dir }}/${{ matrix.artifact_glob }})
                   if [ ${#matches[@]} -eq 0 ]; then
                       echo "::error::No ${{ matrix.artifact_glob }} found in ${{ matrix.out_dir }}"
                       ls -la ${{ matrix.out_dir }} || true
