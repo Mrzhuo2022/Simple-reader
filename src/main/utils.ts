@@ -7,6 +7,25 @@ import { initMainTouchBar } from "./touchbar"
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fontList = require("font-list")
 
+/**
+ * Return the application version from package.json.
+ *
+ * app.getVersion() returns the Electron binary version in development mode
+ * (e.g. 39.8.10) because the app metadata is only injected by electron-builder
+ * at packaging time. Reading package.json directly gives the correct app
+ * version (e.g. 1.2.0) in both development and packaged builds.
+ */
+function getAppVersion(): string {
+    try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pkg = require("../../package.json")
+        if (pkg && typeof pkg.version === "string") return pkg.version
+    } catch {
+        /* fall through */
+    }
+    return app.getVersion()
+}
+
 export function setUtilsListeners(manager: WindowManager) {
     async function openExternal(url: string, background = false) {
         if (url.startsWith("https://") || url.startsWith("http://")) {
@@ -37,7 +56,7 @@ export function setUtilsListeners(manager: WindowManager) {
     })
 
     ipcMain.on("get-version", event => {
-        event.returnValue = app.getVersion()
+        event.returnValue = getAppVersion()
     })
 
     ipcMain.handle("open-external", (_, url: string, background: boolean) => {
