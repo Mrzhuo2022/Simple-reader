@@ -62,7 +62,6 @@ class Settings extends React.Component<SettingsProps> {
                 </div>
                 <div
                     className={"settings " + AnimationClassNames.slideUpIn20}
-                    style={{ marginBottom: 40, height: "calc(100% - 104px)" }}
                 >
                     {this.props.blocked && (
                         <FocusTrapZone isClickableOutsideFocusTrap={true} className="loading">

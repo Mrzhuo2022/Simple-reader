@@ -480,3 +480,41 @@ export function getRootHTMLScript(): string {
         return document.body.innerHTML || '';
     })()`
 }
+
+/**
+ * Extracts clean readable plain text from the rendered article body for
+ * summarization. Walks the article container, collects paragraph/heading/list
+ * text while skipping scripts, styles, nav, and AI-injected translation blocks.
+ * This lets summarization fall back to the actually-rendered article (including
+ * full content fetched by the readability loader) when the RSS payload is empty
+ * or just a short snippet.
+ */
+export function getArticlePlainTextScript(): string {
+    return `(() => {
+        const root = document.querySelector('article')
+            || document.getElementById('main')
+            || document.body;
+        if (!root) return '';
+        // Clone so we can strip noise without mutating the live DOM.
+        const clone = root.cloneNode(true);
+        for (const bad of Array.from(clone.querySelectorAll(
+            'script,style,noscript,iframe,nav,header,footer,form,.ai-translation,.title-translation'
+        ))) {
+            bad.remove();
+        }
+        const parts = [];
+        const block = clone.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,th');
+        if (block.length > 0) {
+            for (const el of block) {
+                const t = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+                if (t) parts.push(t);
+            }
+        }
+        // Fallback to the whole container text if no block elements matched.
+        let text = parts.join('\\n');
+        if (!text) {
+            text = (clone.innerText || clone.textContent || '').replace(/\\s+/g, ' ').trim();
+        }
+        return text;
+    })()`
+}

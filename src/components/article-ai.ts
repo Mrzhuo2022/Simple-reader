@@ -452,26 +452,45 @@ export class ArticleAIHandler {
         { success: true; content: string } | { success: false; reason: "no-content" | "too-short" }
     > {
         const item = this.getItem()
-        // Try providedContent first, but only if it's not an empty string
-        // If providedContent is empty or undefined, fall back to item.content
-        let body = ""
+
+        const build = (plainBody: string) => ({
+            success: true as const,
+            content: `${item.title}\n\n${plainBody}`,
+        })
+
+        // Source 1: explicitly provided full content (manual summarize after
+        // the readability loader has run).
         if (providedContent && providedContent.trim()) {
-            body = providedContent
-        } else if (item.content) {
-            body = item.content
-        }
-        
-        if (!body) {
-            return { success: false, reason: "no-content" }
+            const plain = this.stripHtmlTags(providedContent).trim()
+            if (plain.length >= 50) return build(plain)
         }
 
-        const plainBody = this.stripHtmlTags(body).trim()
-        if (!plainBody || plainBody.length < 50) {
-            return { success: false, reason: "too-short" }
+        // Source 2: the raw RSS payload (item.content). Many feeds ship only a
+        // short snippet here, so this is best-effort.
+        if (item.content) {
+            const plain = this.stripHtmlTags(item.content).trim()
+            if (plain.length >= 50) return build(plain)
         }
 
-        const content = `${item.title}\n\n${plainBody}`
-        return { success: true, content }
+        // Source 3 (fallback): the actually-rendered article in the webview.
+        // This is where the full readable body lives once the page (and the
+        // optional full-content loader) has rendered. Mirrors how translation
+        // extracts text from the DOM.
+        try {
+            await this.waitForArticleReady()
+            const domText =
+                (await this.webviewExecutor.executeScript<string>(
+                    ArticleScripts.getArticlePlainTextScript()
+                )) || ""
+            const plain = domText.replace(/<[^>]*>/g, "").trim()
+            if (plain.length >= 50) return build(plain)
+        } catch (e) {
+            console.warn("[AI] DOM text extraction for summary failed:", e)
+        }
+
+        // All sources exhausted. Report the most informative reason.
+        if (!item.content) return { success: false, reason: "no-content" }
+        return { success: false, reason: "too-short" }
     }
 
     private stripHtmlTags(input: string): string {
