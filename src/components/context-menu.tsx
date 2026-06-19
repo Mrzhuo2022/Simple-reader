@@ -464,6 +464,7 @@ function ViewContextMenu() {
         {
             key: "showHidden",
             text: intl.get("context.showHidden"),
+            iconProps: { iconName: "Hide3" },
             canCheck: true,
             checked: Boolean(filter & FilterType.ShowHidden),
             onClick: () => dispatch(toggleFilter(FilterType.ShowHidden)),

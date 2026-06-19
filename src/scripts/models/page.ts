@@ -88,7 +88,11 @@ export function selectAllArticles(init = false): AppThunk {
     return (dispatch, getState) => {
         const filter = getState().page.filter
         const savedType = window.settings.getFilterType()
-        if (filter.type !== savedType) {
+        // Only restore a persisted filter type when one actually exists.
+        // getFilterType() returns null before the user has chosen a filter;
+        // applying null here would overwrite the in-memory default
+        // (Default | CaseInsensitive) and collapse the feed to near-empty.
+        if (savedType !== null && filter.type !== savedType) {
             dispatch(
                 applyFilterDone({
                     ...filter,
@@ -132,7 +136,8 @@ export function selectSources(sids: number[], menuKey: string, title: string): A
     return (dispatch, getState) => {
         const filter = getState().page.filter
         const savedType = window.settings.getFilterType()
-        if (filter.type !== savedType) {
+        // See selectAllArticles: don't overwrite the default with null.
+        if (savedType !== null && filter.type !== savedType) {
             dispatch(
                 applyFilterDone({
                     ...filter,
