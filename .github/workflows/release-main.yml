@@ -10,13 +10,24 @@ jobs:
         runs-on: windows-latest
 
         steps:
-            - uses: actions/checkout@v2
+            - uses: actions/checkout@v4
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "pnpm"
 
             - name: Build and package the app
               run: |
-                  npm install
-                  npm run build
-                  npm run package-win-ci
+                  pnpm install
+                  pnpm run build
+                  pnpm run package-win-ci
 
             - name: Get app version
               id: package-version
@@ -51,13 +62,24 @@ jobs:
         runs-on: macos-latest
 
         steps:
-            - uses: actions/checkout@v2
+            - uses: actions/checkout@v4
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "pnpm"
 
             - name: Build and package the app (macOS)
               run: |
-                  npm install
-                  npm run build
-                  npm run package-mac
+                  pnpm install
+                  pnpm run build
+                  pnpm run package-mac
 
             - name: Get app version
               id: package-version
@@ -84,13 +106,24 @@ jobs:
         runs-on: ubuntu-latest
 
         steps:
-            - uses: actions/checkout@v2
+            - uses: actions/checkout@v4
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v4
+              with:
+                  version: 10
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "pnpm"
 
             - name: Build and package the app (Linux)
               run: |
-                  npm install
-                  npm run build
-                  npm run package-linux
+                  pnpm install
+                  pnpm run build
+                  pnpm run package-linux
 
             - name: Get app version
               id: package-version

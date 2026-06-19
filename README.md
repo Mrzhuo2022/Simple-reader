@@ -57,18 +57,18 @@ If you enjoy using this app, consider supporting its development by donating thr
 ### Build from source
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Compile TypeScript and dependencies
-npm run build
+pnpm run build
 
 # Start the application
-npm run electron
+pnpm run electron
 
 # Package for distribution
-npm run package-win    # Windows
-npm run package-mac    # macOS
-npm run package-linux  # Linux
+pnpm run package-win    # Windows
+pnpm run package-mac    # macOS
+pnpm run package-linux  # Linux
 ```
 
 ### Developed with
