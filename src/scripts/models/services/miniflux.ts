@@ -212,14 +212,14 @@ export const minifluxServiceHooks: ServiceHooks = {
 
             if (source.rules) {
                 SourceRule.applyAll(source.rules, parsedItem)
-                if ((item.status === "read") !== parsedItem.hasRead)
-                    parsedItem.hasRead
-                        ? minifluxServiceHooks.markRead(parsedItem)
-                        : minifluxServiceHooks.markUnread(parsedItem)
-                if (item.starred !== parsedItem.starred)
-                    parsedItem.starred
-                        ? minifluxServiceHooks.star(parsedItem)
-                        : minifluxServiceHooks.unstar(parsedItem)
+                if ((item.status === "read") !== parsedItem.hasRead) {
+                    if (parsedItem.hasRead) minifluxServiceHooks.markRead(parsedItem)
+                    else minifluxServiceHooks.markUnread(parsedItem)
+                }
+                if (item.starred !== parsedItem.starred) {
+                    if (parsedItem.starred) minifluxServiceHooks.star(parsedItem)
+                    else minifluxServiceHooks.unstar(parsedItem)
+                }
             }
 
             return parsedItem
