@@ -52,7 +52,11 @@ module.exports = [
         mode: "production",
         entry: "./src/index.tsx",
         target: "web",
-        devtool: "source-map",
+        // Source maps are excluded from packaged builds (electron-builder
+        // drops *.js.map) and would ship the full @fluentui/react source to
+        // users, so don't emit them in production. Re-enable locally if you
+        // need to debug the renderer.
+        devtool: false,
         performance: {
             hints: false,
         },

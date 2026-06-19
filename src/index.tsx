@@ -19,9 +19,11 @@ window.utils.addMainContextListener((pos, text) => {
 })
 
 window.fontList = [""]
-window.utils.initFontList().then(fonts => {
-    window.fontList.push(...fonts)
-})
+window.utils.initFontList()
+    .then(fonts => {
+        window.fontList.push(...fonts)
+    })
+    .catch(e => console.error("initFontList failed:", e))
 
 const container = document.getElementById("app")
 const root = createRoot(container!)

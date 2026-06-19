@@ -25,6 +25,18 @@ import { getCurrentLocale, setThemeDefaultFont } from "../settings"
 import locales from "../i18n/_locales"
 import { SYNC_SERVICE, ServiceActionTypes } from "./service"
 
+// Cap the in-memory log list so it cannot grow unboundedly for the lifetime
+// of the app (every fetch / sync / notification appends). Keep the most
+// recent entries; older ones are dropped from state (they were ephemeral
+// status messages, not persistent records).
+const MAX_LOGS = 200
+
+/** Append a log and trim to MAX_LOGS, returning a new logs array. */
+function appendLog(logs: AppLog[], entry: AppLog): AppLog[] {
+    const next = logs.length >= MAX_LOGS ? logs.slice(logs.length - MAX_LOGS + 1) : logs
+    next.push(entry)
+    return next
+}
 export const enum ContextMenuType {
     Hidden,
     Item,
@@ -513,14 +525,11 @@ export function appReducer(
                         logMenu: {
                             ...state.logMenu,
                             notify: true,
-                            logs: [
-                                ...state.logMenu.logs,
-                                new AppLog(
-                                    AppLogType.Failure,
-                                    intl.get("log.syncFailure"),
-                                    String(action.err)
-                                ),
-                            ],
+                            logs: appendLog(state.logMenu.logs, new AppLog(
+                                AppLogType.Failure,
+                                intl.get("log.syncFailure"),
+                                String(action.err)
+                            )),
                         },
                     }
                 default:
@@ -544,16 +553,13 @@ export function appReducer(
                         logMenu: {
                             ...state.logMenu,
                             notify: !state.logMenu.display,
-                            logs: [
-                                ...state.logMenu.logs,
-                                new AppLog(
-                                    AppLogType.Failure,
-                                    intl.get("log.fetchFailure", {
-                                        name: action.errSource.name,
-                                    }),
-                                    String(action.err)
-                                ),
-                            ],
+                            logs: appendLog(state.logMenu.logs, new AppLog(
+                                AppLogType.Failure,
+                                intl.get("log.fetchFailure", {
+                                    name: action.errSource.name,
+                                }),
+                                String(action.err)
+                            )),
                         },
                     }
                 case ActionStatus.Success:
@@ -566,15 +572,12 @@ export function appReducer(
                                 ? state.logMenu
                                 : {
                                       ...state.logMenu,
-                                      logs: [
-                                          ...state.logMenu.logs,
-                                          new AppLog(
-                                              AppLogType.Info,
-                                              intl.get("log.fetchSuccess", {
-                                                  count: action.items.length,
-                                              })
-                                          ),
-                                      ],
+                                      logs: appendLog(state.logMenu.logs, new AppLog(
+                                          AppLogType.Info,
+                                          intl.get("log.fetchSuccess", {
+                                              count: action.items.length,
+                                          })
+                                      )),
                                   },
                     }
                 case ActionStatus.Intermediate:
@@ -731,10 +734,12 @@ export function appReducer(
                 logMenu: {
                     ...state.logMenu,
                     notify: true,
-                    logs: [
-                        ...state.logMenu.logs,
-                        new AppLog(AppLogType.Article, action.title, action.source, action.iid),
-                    ],
+                    logs: appendLog(state.logMenu.logs, new AppLog(
+                        AppLogType.Article,
+                        action.title,
+                        action.source,
+                        action.iid
+                    )),
                 },
             }
         default:

@@ -9,7 +9,7 @@ import { groupReducer } from "./models/group"
 import { pageReducer } from "./models/page"
 import { serviceReducer } from "./models/service"
 import { AppDispatch } from "./utils"
-import { TypedUseSelectorHook, useDispatch, useSelector, useStore } from "react-redux"
+import { TypedUseSelectorHook, useDispatch, useSelector } from "react-redux"
 
 export const rootReducer = combineReducers({
     sources: sourceReducer,
@@ -25,9 +25,7 @@ export const rootStore = configureStore({
     reducer: rootReducer,
 })
 
-export type AppStore = typeof rootStore
 export type RootState = ReturnType<typeof rootReducer>
 
 export const useAppDispatch: () => AppDispatch = useDispatch
 export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector
-export const useAppStore: () => AppStore = useStore

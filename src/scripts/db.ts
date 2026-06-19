@@ -22,7 +22,7 @@ sdbSchema
     .addNullable(["iconurl", "serviceRef", "rules"])
     .addIndex("idxURL", ["url"], true)
 
-const idbSchema = lf.schema.create("itemsDB", 3)
+const idbSchema = lf.schema.create("itemsDB", 4)
 idbSchema
     .createTable("items")
     .addColumn("_id", lf.Type.INTEGER)
@@ -54,6 +54,10 @@ idbSchema
     ])
     .addIndex("idxDate", ["date"], false, lf.Order.DESC)
     .addIndex("idxService", ["serviceRef"], false)
+    // Index on the source column: it is the join/filter key for feed loading,
+    // mark-all-read, unread counts and source deletion — previously every one
+    // of those scanned without a covering index.
+    .addIndex("idxSource", ["source"], false)
 
 export let sourcesDB: lf.Database
 export let sources: lf.schema.Table
@@ -79,6 +83,10 @@ async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
     if (version < 3) {
         await rawDb.addTableColumn("items", "autoFullText", null)
     }
+    // v4 adds the idxSource index. lovefield cannot add an index to an existing
+    // db via the raw BackStore API (it only supports addTableColumn), so there
+    // is no data migration to perform here — lovefield reconciles index
+    // metadata against the new schema on connect. Existing rows are preserved.
 }
 
 export async function init() {

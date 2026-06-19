@@ -53,6 +53,10 @@ class Article extends React.Component<ArticleProps, ArticleState> {
     private webview: Electron.WebviewTag | null = null
     private aiHandler: ArticleAIHandler | null = null
     private unmounted: boolean = false
+    // Cache for the computed webview src. Building it runs renderToString +
+    // encodeURIComponent over the whole article body, so we only recompute when
+    // one of the inputs actually changes instead of on every render.
+    private articleViewCache: { sig: string; url: string } | null = null
 
     constructor(props: ArticleProps) {
         super(props)
@@ -79,7 +83,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
         
         
         if (props.source.openTarget === SourceOpenTarget.FullContent) {
-            this.loadFull()
+            this.loadFull().catch(e => console.error("loadFull failed:", e))
         }
     }
 
@@ -126,7 +130,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
                 }
             )
             if (this.props.source.openTarget === SourceOpenTarget.FullContent) {
-                this.loadFull()
+                this.loadFull().catch(e => console.error("loadFull failed:", e))
             }
         }
         
@@ -291,7 +295,9 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             }
             
             // Auto-run AI features if configured
-            this.aiHandler.maybeAutoRunAI()
+            this.aiHandler.maybeAutoRunAI().catch(e =>
+                console.warn("[AI] auto-run failed:", e)
+            )
         })
     }
 
@@ -304,7 +310,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             this.setState({ loaded: false, error: false })
             this.webview.reload()
         } else if (this.state.loadFull) {
-            this.loadFull()
+            this.loadFull().catch(e => console.error("loadFull failed:", e))
         }
     }
 
@@ -587,7 +593,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             this.setState({ loadFull: false })
         } else if (this.canLoadFullFromUrl()) {
             this.setState({ loadFull: true, loadWebpage: false })
-            this.loadFull()
+            this.loadFull().catch(e => console.error("loadFull failed:", e))
         }
     }
 
@@ -646,6 +652,25 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             ? this.state.fullContent
             : this.props.item.content || this.props.item.snippet || ""
 
+        // Signature covers every input that affects the generated URL. If none
+        // changed since the last call, reuse the cached URL and skip the
+        // expensive renderToString + encodeURIComponent pass.
+        const sig = [
+            this.state.loadFull ? "1" : "0",
+            articleContent,
+            this.props.item.title,
+            String(this.props.item.date.getTime()),
+            this.props.locale,
+            this.state.fontFamily,
+            String(this.state.fontSize),
+            String(this.props.source.textDir),
+            this.props.item.link,
+        ].join("\u0000")
+
+        if (this.articleViewCache && this.articleViewCache.sig === sig) {
+            return this.articleViewCache.url
+        }
+
         const a = encodeURIComponent(articleContent)
 
         const h = encodeURIComponent(
@@ -661,11 +686,13 @@ class Article extends React.Component<ArticleProps, ArticleState> {
                 </>
             )
         )
-        return `article/article.html?a=${a}&h=${h}&f=${encodeURIComponent(
+        const url = `article/article.html?a=${a}&h=${h}&f=${encodeURIComponent(
             this.state.fontFamily
         )}&s=${this.state.fontSize}&d=${this.props.source.textDir}&u=${this.props.item.link}&m=${
             this.state.loadFull ? 1 : 0
         }`
+        this.articleViewCache = { sig, url }
+        return url
     }
 
     render = () => (

@@ -184,14 +184,6 @@ export function initSourcesSuccess(sources: SourceState): SourceActionTypes {
     }
 }
 
-export function initSourcesFailure(err): SourceActionTypes {
-    return {
-        type: INIT_SOURCES,
-        status: ActionStatus.Failure,
-        err: err,
-    }
-}
-
 async function unreadCount(sources: SourceState): Promise<SourceState> {
     const rows = await db.itemsDB
         .select(db.items.source, lf.fn.count(db.items._id))

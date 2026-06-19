@@ -43,7 +43,9 @@ class AITab extends React.Component<AITabProps, AITabState> {
     }
 
     componentDidMount() {
-        this.refreshCacheSize()
+        this.refreshCacheSize().catch(() => {
+            /* non-fatal: cache size is informational */
+        })
     }
 
     refreshCacheSize = async () => {

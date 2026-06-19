@@ -263,6 +263,7 @@ export function markRead(item: RSSItem): AppThunk {
                 .where(db.items._id.eq(item._id))
                 .set(db.items.hasRead, true)
                 .exec()
+                .catch(e => console.error("Failed to persist markRead:", e))
             dispatch(markReadDone(item))
             if (item.serviceRef) {
                 dispatch(dispatch(getServiceHooks()).markRead?.(item))
@@ -317,6 +318,7 @@ export function markUnread(item: RSSItem): AppThunk {
                 .where(db.items._id.eq(item._id))
                 .set(db.items.hasRead, false)
                 .exec()
+                .catch(e => console.error("Failed to persist markUnread:", e))
             dispatch(markUnreadDone(item))
             if (item.serviceRef) {
                 dispatch(dispatch(getServiceHooks()).markUnread?.(item))
@@ -337,6 +339,7 @@ export function toggleStarred(item: RSSItem): AppThunk {
             .where(db.items._id.eq(item._id))
             .set(db.items.starred, !item.starred)
             .exec()
+            .catch(e => console.error("Failed to persist toggleStarred:", e))
         dispatch(toggleStarredDone(item))
         if (item.serviceRef) {
             const hooks = dispatch(getServiceHooks())
@@ -358,6 +361,7 @@ export function toggleHidden(item: RSSItem): AppThunk {
             .where(db.items._id.eq(item._id))
             .set(db.items.hidden, !item.hidden)
             .exec()
+            .catch(e => console.error("Failed to persist toggleHidden:", e))
         dispatch(toggleHiddenDone(item))
     }
 }

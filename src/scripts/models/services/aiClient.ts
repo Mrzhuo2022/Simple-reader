@@ -433,7 +433,6 @@ export async function translateTextByParagraph(
                     success = true
                 } else {
                     const delay = Math.min(1000 * Math.pow(1.5, retryCount - 1), 10000)
-                    // console.warn(`Batch failed, retrying in ${delay}ms...`)
                     await new Promise(resolve => setTimeout(resolve, delay))
                 }
             }
