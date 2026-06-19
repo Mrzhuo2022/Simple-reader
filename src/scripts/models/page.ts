@@ -155,10 +155,13 @@ export function selectSources(sids: number[], menuKey: string, title: string): A
     }
 }
 
-export function switchView(viewType: ViewType): PageActionTypes {
-    return {
-        type: SWITCH_VIEW,
-        viewType: viewType,
+export function switchView(viewType: ViewType): AppThunk {
+    return dispatch => {
+        window.settings.setDefaultView(viewType)
+        dispatch({
+            type: SWITCH_VIEW,
+            viewType: viewType,
+        })
     }
 }
 
