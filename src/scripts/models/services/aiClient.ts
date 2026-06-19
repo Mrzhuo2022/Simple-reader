@@ -170,8 +170,8 @@ export async function summarizeArticle(
 ): Promise<string> {
     const isZh = /[\u4e00-\u9fa5]/.test(content)
     const defaultPrompt = isZh
-        ? "你是一个专业的 RSS 文章摘要助手。请用简洁的中文总结文章的核心要点，保持客观准确，不要编造文中没有的信息。摘要应该在 3-5 句话之内。"
-        : "You are a professional article summarizer. Summarize the key points of the article concisely and objectively, without inventing information not present in the text. Keep the summary to 3-5 sentences."
+        ? "用自然的口语帮读者快速了解这篇文章讲了什么，就像跟朋友随口讲一句“这篇文章其实说的是……”那样。一两句话讲清核心观点就好，不要分点、不要小标题、不要套话，不要编造原文没有的内容。"
+        : "Tell the reader what this article is actually about in a natural, conversational way — like casually explaining to a friend 'so this piece is basically saying…'. One or two sentences capturing the core point is enough. No bullet points, no headings, no filler, and don't invent anything not in the text."
 
     const hasCustomPrompt = Boolean(config.prompts?.summary)
     const systemPrompt = config.prompts?.summary || defaultPrompt

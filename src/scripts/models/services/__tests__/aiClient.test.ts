@@ -114,7 +114,7 @@ describe("aiClient", () => {
             const lastCall = (global.fetch as jest.Mock).mock.calls[0]
             const body = JSON.parse(lastCall[1].body)
             expect(body.messages[0].role).toBe("system")
-            expect(body.messages[0].content).toContain("摘要助手")
+            expect(body.messages[0].content).toContain("不要分点")
             expect(body.messages[1].content).toContain("这是一篇中文文章内容")
         })
 
@@ -134,7 +134,7 @@ describe("aiClient", () => {
             const lastCall = (global.fetch as jest.Mock).mock.calls[0]
             const body = JSON.parse(lastCall[1].body)
             expect(body.messages[0].role).toBe("system")
-            expect(body.messages[0].content).toContain("summarizer")
+            expect(body.messages[0].content).toContain("bullet points")
             expect(body.messages[1].content).toContain("Article content in English")
         })
 
