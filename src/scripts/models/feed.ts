@@ -48,8 +48,14 @@ export class FeedFilter {
             const flags = type & FilterType.CaseInsensitive ? "i" : ""
             const regex = RegExp(filter.search, flags)
             if (type & FilterType.FullSearch) {
+                // Include the full content column so searches reach the article
+                // body, not just the (often truncated/empty) title + snippet.
                 predicates.push(
-                    lf.op.or(db.items.title.match(regex), db.items.snippet.match(regex))
+                    lf.op.or(
+                        db.items.title.match(regex),
+                        db.items.snippet.match(regex),
+                        db.items.content.match(regex)
+                    )
                 )
             } else {
                 predicates.push(db.items.title.match(regex))
@@ -68,7 +74,7 @@ export class FeedFilter {
             const flags = type & FilterType.CaseInsensitive ? "i" : ""
             const regex = RegExp(filter.search, flags)
             if (type & FilterType.FullSearch) {
-                flag = flag && (regex.test(item.title) || regex.test(item.snippet))
+                flag = flag && (regex.test(item.title) || regex.test(item.snippet) || regex.test(item.content || ""))
             } else if (type & FilterType.CreatorSearch) {
                 flag = flag && regex.test(item.creator || "")
             } else {

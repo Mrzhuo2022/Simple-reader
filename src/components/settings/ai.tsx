@@ -23,6 +23,7 @@ type AITabState = {
     configs: AIConfigs
     testing: boolean
     loadingModels: boolean
+    cacheSize: { bytes: number; count: number } | null
     message: {
         type: MessageBarType
         text: string
@@ -36,8 +37,28 @@ class AITab extends React.Component<AITabProps, AITabState> {
             configs: window.settings.getAIConfigs(),
             testing: false,
             loadingModels: false,
+            cacheSize: null,
             message: null,
         }
+    }
+
+    componentDidMount() {
+        this.refreshCacheSize()
+    }
+
+    refreshCacheSize = async () => {
+        try {
+            const size = await window.settings.getAICacheSize()
+            this.setState({ cacheSize: size })
+        } catch {
+            /* non-fatal */
+        }
+    }
+
+    private formatCacheSize = (bytes: number): string => {
+        if (bytes < 1024) return `${bytes} B`
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     }
 
     handleToggle = (checked: boolean) => {
@@ -307,6 +328,7 @@ class AITab extends React.Component<AITabProps, AITabState> {
 
         try {
             await window.settings.clearOldAICache(0)
+            await this.refreshCacheSize()
             this.setState({
                 message: {
                     type: MessageBarType.success,
@@ -537,8 +559,16 @@ class AITab extends React.Component<AITabProps, AITabState> {
                     disabled={!configs.enabled}
                 />
 
-                <Stack horizontal tokens={{ childrenGap: 8 }}>
+                <Stack horizontal tokens={{ childrenGap: 8 }} verticalAlign="center">
                     <DefaultButton text={intl.get("ai.clearCache")} onClick={this.clearAICache} />
+                    {this.state.cacheSize && this.state.cacheSize.bytes > 0 && (
+                        <Label style={{ fontWeight: 400 }}>
+                            {intl.get("ai.cacheSize", {
+                                size: this.formatCacheSize(this.state.cacheSize.bytes),
+                                count: this.state.cacheSize.count,
+                            })}
+                        </Label>
+                    )}
                 </Stack>
 
                 <MessageBar messageBarType={MessageBarType.info}>

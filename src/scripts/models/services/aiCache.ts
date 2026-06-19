@@ -113,6 +113,28 @@ export function getCache(itemId: string): AICacheEntry | null {
     }
 }
 
+/**
+ * Total size of the AI cache file on disk, in bytes. Returns 0 before the
+ * cache is initialized or if the file does not exist yet.
+ */
+export function getCacheSize(): number {
+    if (!cacheFilePath) return 0
+    try {
+        if (!fs.existsSync(cacheFilePath)) return 0
+        return fs.statSync(cacheFilePath).size
+    } catch (error) {
+        console.error("Failed to get cache size:", error)
+        return 0
+    }
+}
+
+/**
+ * Number of cached entries (articles with summary/translation cached).
+ */
+export function getCacheCount(): number {
+    return cacheData.size
+}
+
 export function clearOldCache(daysToKeep: number = 30): void {
     if (!cacheFilePath) return
 

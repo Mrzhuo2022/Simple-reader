@@ -157,6 +157,9 @@ const settingsBridge = {
     clearOldAICache: async (daysToKeep: number = 30): Promise<void> => {
         return ipcRenderer.invoke("ai-cache-clear-old", daysToKeep)
     },
+    getAICacheSize: async (): Promise<{ bytes: number; count: number }> => {
+        return ipcRenderer.invoke("ai-cache-size")
+    },
 
     getAll: (): Record<string, unknown> => {
         return ipcRenderer.sendSync("get-all-settings") as Record<string, unknown>

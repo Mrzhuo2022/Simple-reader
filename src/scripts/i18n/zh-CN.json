@@ -345,6 +345,7 @@
         "maxTextLength": "单次请求最大字符数",
         "maxTextLengthDesc": "超过限制将强制截断批次",
         "summaryPrompt": "自定义摘要提示词（留空使用默认）",
-        "translationPrompt": "自定义翻译提示词（留空使用默认）"
+        "translationPrompt": "自定义翻译提示词（留空使用默认）",
+        "cacheSize": "{count} 条，共 {size}"
     }
 }

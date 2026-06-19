@@ -347,6 +347,7 @@
         "maxTextLength": "Max characters per request",
         "maxTextLengthDesc": "Batches exceeding this are truncated",
         "summaryPrompt": "Custom summary prompt (leave empty for default)",
-        "translationPrompt": "Custom translation prompt (leave empty for default)"
+        "translationPrompt": "Custom translation prompt (leave empty for default)",
+        "cacheSize": "{count} entries, {size}"
     }
 }

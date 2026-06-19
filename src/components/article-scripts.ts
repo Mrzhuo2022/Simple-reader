@@ -37,6 +37,32 @@ const SANITIZE_HTML_BODY = `(() => {
 })()`
 
 /**
+ * Injects a thin reading-progress bar pinned to the top of the article webview
+ * and wires a passive scroll listener that updates its width. Everything runs
+ * inside the webview (no IPC round-trips on scroll). Safe to call repeatedly:
+ * it reuses the existing bar if present.
+ */
+export function getReadingProgressScript(): string {
+    return `(() => {
+        if (document.getElementById('ai-reading-progress')) return true;
+        const bar = document.createElement('div');
+        bar.id = 'ai-reading-progress';
+        bar.style.cssText = 'position:fixed;top:0;left:0;height:3px;width:0;z-index:9999;background:var(--primary,#0078d4);transition:width 80ms ease-out;pointer-events:none;';
+        document.body.appendChild(bar);
+        const update = () => {
+            const el = document.scrollingElement || document.documentElement;
+            const max = el.scrollHeight - el.clientHeight;
+            const pct = max > 0 ? Math.min(100, Math.max(0, (el.scrollTop / max) * 100)) : 0;
+            bar.style.width = pct + '%';
+        };
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update, { passive: true });
+        update();
+        return true;
+    })()`
+}
+
+/**
  * Injects code block styling into the WebView
  */
 export function getCodeBlockStylesScript(): string {

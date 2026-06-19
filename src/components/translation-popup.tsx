@@ -70,6 +70,10 @@ export const TranslationPopup = () => {
         }
 
         if (!shouldTranslate) {
+            // Nothing to translate for this text under the current language
+            // policy — show the selected text itself instead of an empty popup
+            // (which otherwise looks broken).
+            setTranslation(text.replace(/<[^>]*>/g, ""))
             return
         }
 

@@ -253,10 +253,15 @@ class Article extends React.Component<ArticleProps, ArticleState> {
         await this.webviewExec(ArticleScripts.getCodeBlockStylesScript())
     }
 
+    private injectReadingProgress = async () => {
+        await this.webviewExec(ArticleScripts.getReadingProgressScript())
+    }
+
     private webviewLoaded = () => {
         this.setState({ loaded: true }, () => {
             this.injectCodeBlockStyles().catch(console.warn)
-            
+            this.injectReadingProgress().catch(console.warn)
+
             if (!this.aiHandler) return
             
             // Inject AI summary if available, then sync its visibility

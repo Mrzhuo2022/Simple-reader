@@ -295,6 +295,11 @@ ipcMain.handle("ai-cache-clear-old", (_, daysToKeep: number) => {
     aiCache.clearOldCache(daysToKeep)
 })
 
+ipcMain.handle("ai-cache-size", () => {
+    ensureCacheInit()
+    return { bytes: aiCache.getCacheSize(), count: aiCache.getCacheCount() }
+})
+
 app.on("before-quit", () => {
     aiCache.closeDB()
 })
