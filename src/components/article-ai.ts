@@ -28,6 +28,7 @@ export interface TranslationItem {
 export interface ArticleAIState {
     aiSummary: string
     aiSummaryLoading: boolean
+    showSummary: boolean
     showTranslation: boolean
     titleTranslation: string
     aiTranslation: TranslationItem[]
@@ -82,6 +83,7 @@ export class ArticleAIHandler {
 
                 if (cache.summary) {
                     updates.aiSummary = cache.summary
+                    updates.showSummary = true
                 }
 
                 if (cache.translation) {
@@ -160,12 +162,39 @@ export class ArticleAIHandler {
     }
 
     /**
+     * Toggle the AI summary: show/hide when a summary already exists, or
+     * generate one when none exists. Pass { force: true } to regenerate.
+     */
+    async toggleSummary(fullContent?: string, opts?: { force?: boolean }): Promise<void> {
+        const state = this.getState()
+        const hasSummary = Boolean(state.aiSummary)
+
+        if (hasSummary && !opts?.force) {
+            // Summary exists: just flip visibility (no API call).
+            const nextShow = !state.showSummary
+            this.updateState({ showSummary: nextShow })
+            await this.setSummaryVisibility(nextShow)
+            return
+        }
+        await this.generateSummary(fullContent, opts)
+    }
+
+    /**
      * Generate AI summary for the article
      */
-    async generateSummary(fullContent?: string): Promise<void> {
+    async generateSummary(fullContent?: string, opts?: { force?: boolean }): Promise<void> {
         const aiConfigs = window.settings.getAIConfigs() as ExtendedAiConfig
         if (!aiConfigs.enabled || !aiConfigs.apiKey) {
             alert(intl.get("ai.notEnabled"))
+            return
+        }
+
+        // Short-circuit: a cached summary already exists and the caller did
+        // not ask to regenerate — just show it instead of spending an API call.
+        if (!opts?.force && this.getState().aiSummary) {
+            this.updateState({ showSummary: true })
+            await this.ensureSummaryInjected()
+            await this.setSummaryVisibility(true)
             return
         }
 
@@ -175,12 +204,12 @@ export class ArticleAIHandler {
         const item = this.getItem()
         const itemId = String(item._id)
 
-        this.updateState({ aiSummaryLoading: true, aiSummary: "" })
-        
+        this.updateState({ aiSummaryLoading: true, aiSummary: "", showSummary: true })
+
         try {
             const fullTextResult = await this.getFullTextForSummary(fullContent)
             if (!fullTextResult.success) {
-                this.updateState({ aiSummaryLoading: false })
+                this.updateState({ aiSummaryLoading: false, showSummary: false })
                 const failureResult = fullTextResult as { success: false; reason: "no-content" | "too-short" }
                 if (failureResult.reason === "no-content") {
                     alert(
@@ -205,11 +234,11 @@ export class ArticleAIHandler {
                 fullTextResult.content,
                 controller.signal
             )
-            
+
             if (itemId === String(this.getItem()._id) && this.summaryAbort === controller) {
-                this.updateState({ aiSummary: summary, aiSummaryLoading: false })
+                this.updateState({ aiSummary: summary, aiSummaryLoading: false, showSummary: true })
                 await this.ensureSummaryInjected(summary)
-                
+
                 try {
                     await window.settings.saveAISummary(String(item._id), summary)
                 } catch (e) {
@@ -221,9 +250,9 @@ export class ArticleAIHandler {
             if (err.name === "AbortError") {
                 return
             }
-            alert(`${intl.get("ai.failed")}: ${err.message}`)
+            alert(`${intl.get("ai.failed")}: ${(err as Error)?.message || String(error)}`)
             if (itemId === String(this.getItem()._id) && this.summaryAbort === controller) {
-                this.updateState({ aiSummaryLoading: false })
+                this.updateState({ aiSummaryLoading: false, showSummary: false })
             }
         }
     }
@@ -350,13 +379,26 @@ export class ArticleAIHandler {
     async ensureSummaryInjected(summaryText?: string): Promise<void> {
         const text = summaryText || this.getState().aiSummary
         if (!text) return
-        
+
         await this.waitForArticleReady()
         try {
             await this.webviewExecutor.executeScript(ArticleScripts.getInjectSummaryScript(text))
         } catch (e) {
             const error = e as Error
             console.warn("inject summary failed:", error.message || String(e))
+        }
+    }
+
+    /**
+     * Show or hide the injected summary box in the WebView
+     */
+    async setSummaryVisibility(show: boolean): Promise<void> {
+        try {
+            await this.webviewExecutor.executeScript(
+                ArticleScripts.getSetSummaryVisibilityScript(show)
+            )
+        } catch (e) {
+            console.warn("set summary visibility failed:", (e as Error)?.message || String(e))
         }
     }
 

@@ -89,7 +89,27 @@ describe("aiClient", () => {
     })
 
     describe("summarizeArticle", () => {
-        it("should call chatCompletion with correct prompt", async () => {
+        it("should call chatCompletion with Chinese prompt for Chinese content", async () => {
+            const mockResponse = {
+                choices: [{ message: { content: "文章摘要。" } }],
+            }
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => mockResponse,
+            })
+
+            const summary = await summarizeArticle(mockConfig, "这是一篇中文文章内容")
+            expect(summary).toBe("文章摘要。")
+
+            // Chinese content should use the Chinese default prompt
+            const lastCall = (global.fetch as jest.Mock).mock.calls[0]
+            const body = JSON.parse(lastCall[1].body)
+            expect(body.messages[0].role).toBe("system")
+            expect(body.messages[0].content).toContain("摘要助手")
+            expect(body.messages[1].content).toContain("这是一篇中文文章内容")
+        })
+
+        it("should use an English prompt for English content", async () => {
             const mockResponse = {
                 choices: [{ message: { content: "Summary of the article." } }],
             }
@@ -98,15 +118,34 @@ describe("aiClient", () => {
                 json: async () => mockResponse,
             })
 
-            const summary = await summarizeArticle(mockConfig, "Article content")
+            const summary = await summarizeArticle(mockConfig, "Article content in English")
             expect(summary).toBe("Summary of the article.")
 
-            // Verify the prompt structure
+            // English content should use the English default prompt (no Chinese)
             const lastCall = (global.fetch as jest.Mock).mock.calls[0]
             const body = JSON.parse(lastCall[1].body)
             expect(body.messages[0].role).toBe("system")
-            expect(body.messages[0].content).toContain("摘要助手")
-            expect(body.messages[1].content).toContain("Article content")
+            expect(body.messages[0].content).toContain("summarizer")
+            expect(body.messages[1].content).toContain("Article content in English")
+        })
+
+        it("should truncate very long content", async () => {
+            const mockResponse = {
+                choices: [{ message: { content: "Short summary." } }],
+            }
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => mockResponse,
+            })
+
+            const longContent = "文章".repeat(10000) // well over the cap
+            await summarizeArticle(mockConfig, longContent)
+
+            const lastCall = (global.fetch as jest.Mock).mock.calls[0]
+            const body = JSON.parse(lastCall[1].body)
+            // The user message must be smaller than the raw input
+            expect(body.messages[1].content.length).toBeLessThan(longContent.length)
+            expect(body.messages[1].content).toContain("截断")
         })
     })
 

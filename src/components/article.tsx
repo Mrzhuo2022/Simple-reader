@@ -67,6 +67,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             errorDescription: "",
             aiSummary: "",
             aiSummaryLoading: false,
+            showSummary: false,
             showTranslation: false,
             titleTranslation: "",
             aiTranslation: [],
@@ -106,6 +107,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
                     loadFull: this.props.source.openTarget === SourceOpenTarget.FullContent,
                     aiSummary: "",
                     aiSummaryLoading: false,
+                    showSummary: false,
                     showTranslation: false,
                     titleTranslation: "",
                     aiTranslation: [],
@@ -194,6 +196,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
     private getAIState = (): ArticleAIState => ({
         aiSummary: this.state.aiSummary,
         aiSummaryLoading: this.state.aiSummaryLoading,
+        showSummary: this.state.showSummary,
         showTranslation: this.state.showTranslation,
         titleTranslation: this.state.titleTranslation,
         aiTranslation: this.state.aiTranslation,
@@ -256,11 +259,11 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             
             if (!this.aiHandler) return
             
-            // Inject AI summary if available
+            // Inject AI summary if available, then sync its visibility
             if (this.state.aiSummary) {
-                this.aiHandler.ensureSummaryInjected().catch(err =>
-                    console.warn("inject AI summary after webview loaded failed:", err)
-                )
+                this.aiHandler.ensureSummaryInjected()
+                    .then(() => this.aiHandler!.setSummaryVisibility(this.state.showSummary))
+                    .catch(err => console.warn("inject AI summary after webview loaded failed:", err))
             }
             
             // Handle translation injection
@@ -369,7 +372,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             const aiConfigs = window.settings.getAIConfigs()
             if (aiConfigs.enabled) {
                 if (isMatch(shortcuts.aiSummary, input)) {
-                    this.generateSummary().catch(console.warn)
+                    this.toggleSummary().catch(console.warn)
                     return
                 }
                 if (isMatch(shortcuts.aiTranslation, input)) {
@@ -613,9 +616,15 @@ class Article extends React.Component<ArticleProps, ArticleState> {
 
     // --- AI Feature Handlers ---
 
-    private generateSummary = async () => {
+    private generateSummary = async (opts?: { force?: boolean }) => {
         if (this.aiHandler) {
-            await this.aiHandler.generateSummary(this.state.fullContent)
+            await this.aiHandler.generateSummary(this.state.fullContent, opts)
+        }
+    }
+
+    private toggleSummary = async () => {
+        if (this.aiHandler) {
+            await this.aiHandler.toggleSummary(this.state.fullContent)
         }
     }
 
@@ -716,10 +725,11 @@ class Article extends React.Component<ArticleProps, ArticleState> {
                     />
                     <CommandBarButton
                         title={intl.get("ai.summary")}
+                        className={this.state.showSummary ? "active" : ""}
                         iconProps={{ iconName: "Lightbulb" }}
                         onClick={() => {
-                            this.generateSummary().catch(err => {
-                                console.error("Summary generation error:", err)
+                            this.toggleSummary().catch(err => {
+                                console.error("Summary toggle error:", err)
                             })
                         }}
                         disabled={this.state.aiSummaryLoading}

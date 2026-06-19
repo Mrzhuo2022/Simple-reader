@@ -112,6 +112,14 @@ body.darwin .menu .btn-group {
     box-shadow: 0 6.4px 14.4px 0 rgba(0, 0, 0, 0.132), 0 1.2px 3.6px 0 rgba(0, 0, 0, 0.108);
     overflow: hidden;
 }
+/* The Fluent UI <Pivot> renders a bare wrapper <div> with no height. Without
+   an explicit height here, the percentage height on div[role="tabpanel"]
+   below resolves to auto and the panel never becomes scrollable (its overflow
+   is clipped by .settings' overflow:hidden). Give the Pivot wrapper a real
+   height so the % chain (.settings -> pivot root -> tabpanel) resolves. */
+.settings-container .settings > div {
+    height: 100%;
+}
 div[role="toolbar"] {
     height: 100%;
 }

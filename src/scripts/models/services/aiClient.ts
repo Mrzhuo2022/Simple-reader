@@ -128,6 +128,23 @@ export async function chatCompletion(
 }
 
 /**
+ * Roughly cap the input sent to the summarizer so long articles do not blow
+ * past a model's context window (which would surface as an opaque 400 error).
+ * Keeps the head and the tail of the text so opening/conclusion are both
+ * represented, with a marker in the middle.
+ */
+function capContentForSummary(content: string, maxChars = 12000): string {
+    if (content.length <= maxChars) return content
+    const headLen = Math.floor(maxChars * 0.7)
+    const tailLen = maxChars - headLen
+    return (
+        content.slice(0, headLen) +
+        "\n\n…[内容过长已截断 / content truncated]…\n\n" +
+        content.slice(content.length - tailLen)
+    )
+}
+
+/**
  * Generate a summary for an article
  * @param config AI configuration
  * @param content Article content (title + body)
@@ -138,16 +155,23 @@ export async function summarizeArticle(
     content: string,
     signal?: AbortSignal
 ): Promise<string> {
-    const defaultPrompt =
-        "你是一个专业的 RSS 文章摘要助手。请用简洁的中文总结文章的核心要点，保持客观准确。摘要应该在 3-5 句话之内。"
+    const isZh = /[\u4e00-\u9fa5]/.test(content)
+    const defaultPrompt = isZh
+        ? "你是一个专业的 RSS 文章摘要助手。请用简洁的中文总结文章的核心要点，保持客观准确，不要编造文中没有的信息。摘要应该在 3-5 句话之内。"
+        : "You are a professional article summarizer. Summarize the key points of the article concisely and objectively, without inventing information not present in the text. Keep the summary to 3-5 sentences."
     const systemPrompt = config.prompts?.summary || defaultPrompt
+
+    // Use a language-neutral user wrapper so a user-supplied custom prompt is
+    // not polluted by a Chinese prefix when summarizing English articles.
+    const userContent = capContentForSummary(content)
+    const userMessage = `${isZh ? "文章内容" : "Article"}:\n\n${userContent}`
 
     return await chatCompletion(
         config,
         {
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: `请总结以下文章：\n\n${content}` },
+                { role: "user", content: userMessage },
             ],
             temperature: 0.5,
             max_tokens: 500,
