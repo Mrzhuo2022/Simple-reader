@@ -727,25 +727,32 @@ export class ArticleAIHandler {
     private async saveTranslationCache(): Promise<void> {
         const state = this.getState()
         try {
-            const hasFailure = state.aiTranslation.some(
+            // Only cache entries that actually have usable translations.
+            // Drop paragraphs that failed (empty after retry exhaustion, or
+            // carrying a failure marker) instead of discarding the whole
+            // batch — the good paragraphs should still be cached so they don't
+            // re-hit the API on the next open.
+            const cacheable = state.aiTranslation.filter(
                 t =>
+                    t &&
                     t.translated &&
-                    (t.translated.includes("[翻译失败") ||
-                        t.translated.includes("Translation failed"))
+                    t.translated.trim().length > 0 &&
+                    !t.translated.includes("[翻译失败") &&
+                    !t.translated.includes("Translation failed")
             )
-            if (!hasFailure) {
-                await window.settings.saveAITranslation(
+            if (cacheable.length === 0) {
+                console.warn("[ArticleAI] No cacheable translations, skipping cache save.")
+                return
+            }
+            await window.settings.saveAITranslation(
+                String(this.getItem()._id),
+                JSON.stringify(cacheable)
+            )
+            if (state.titleTranslation) {
+                await window.settings.saveTitleTranslation(
                     String(this.getItem()._id),
-                    JSON.stringify(state.aiTranslation)
+                    state.titleTranslation
                 )
-                if (state.titleTranslation) {
-                    await window.settings.saveTitleTranslation(
-                        String(this.getItem()._id),
-                        state.titleTranslation
-                    )
-                }
-            } else {
-                console.warn("[ArticleAI] Translation contains failure, skipping cache save.")
             }
         } catch (e) {
             console.warn("保存翻译缓存失败:", (e as Error).message)

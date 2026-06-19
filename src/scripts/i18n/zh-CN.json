@@ -336,6 +336,15 @@
         "clearCache": "清空 AI 缓存",
         "clearCacheConfirm": "确认要清空所有 AI 缓存吗？这将删除所有已保存的摘要和翻译结果。",
         "clearCacheSuccess": "AI 缓存已清空",
-        "clearCacheFailed": "清空 AI 缓存失败"
+        "clearCacheFailed": "清空 AI 缓存失败",
+        "advanced": "高级设置",
+        "concurrency": "并发请求数",
+        "concurrencyDesc": "同时进行的翻译请求数量（推荐 3-5）",
+        "maxParagraphs": "单次请求最大段落数",
+        "maxParagraphsDesc": "合并多个段落以减少请求次数（推荐 1-5）",
+        "maxTextLength": "单次请求最大字符数",
+        "maxTextLengthDesc": "超过限制将强制截断批次",
+        "summaryPrompt": "自定义摘要提示词（留空使用默认）",
+        "translationPrompt": "自定义翻译提示词（留空使用默认）"
     }
 }

@@ -58,7 +58,20 @@ export async function listModels(config: AiConfig, signal?: AbortSignal): Promis
             throw new Error(`Failed to list models: ${response.status} ${response.statusText}`)
         }
 
-        const data: ModelsResponse | ModelInfo[] = await response.json()
+        // Read as text first so we can distinguish "endpoint returned HTML"
+        // (wrong baseUrl / proxy login page / auth redirect) from a genuine
+        // JSON parse failure, and give a friendly error instead of an opaque
+        // "Unexpected token '<'".
+        const raw = await response.text()
+        let data: ModelsResponse | ModelInfo[]
+        try {
+            data = JSON.parse(raw)
+        } catch {
+            const snippet = raw.slice(0, 60).replace(/\s+/g, " ")
+            throw new Error(
+                `The endpoint did not return JSON (got "${snippet}…"). Is the API base URL correct? It should be an OpenAI-compatible endpoint ending with /v1.`
+            )
+        }
 
         // Support OpenAI format: { data: [{ id: "model-name" }] }
         if ("data" in data && data.data && Array.isArray(data.data)) {
@@ -401,9 +414,15 @@ export async function translateTextByParagraph(
                         )}:`,
                         error
                     )
-                    // Mark as empty to stop spinning
+                    // Mark with an explicit failure marker instead of an empty
+                    // string so: (1) the UI shows a clear reason rather than a
+                    // blank gap, and (2) the cache layer can detect and skip
+                    // these entries instead of caching blanks silently.
                     batch.indices.forEach(originalIndex => {
-                        results[originalIndex].translated = ""
+                        results[originalIndex].translated = "[翻译失败]"
+                        if (onParagraphTranslated && !signal?.aborted) {
+                            onParagraphTranslated(originalIndex, "[翻译失败]")
+                        }
                     })
                     success = true
                 } else {

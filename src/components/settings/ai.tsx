@@ -463,42 +463,42 @@ class AITab extends React.Component<AITabProps, AITabState> {
                     />
                 </Stack>
 
-                <Label>高级设置</Label>
+                <Label>{intl.get("ai.advanced")}</Label>
                 <Stack horizontal tokens={{ childrenGap: 16 }}>
                     <TextField
-                        label="并发请求数"
+                        label={intl.get("ai.concurrency")}
                         type="number"
                         value={String(configs.concurrency || 5)}
                         onChange={this.handleConcurrencyChange}
                         disabled={!configs.enabled}
                         min={1}
                         max={20}
-                        description="同时进行的翻译请求数量 (推荐 3-5)"
+                        description={intl.get("ai.concurrencyDesc")}
                     />
                     <TextField
-                        label="单次请求最大段落数"
+                        label={intl.get("ai.maxParagraphs")}
                         type="number"
                         value={String(configs.maxParagraphsPerRequest || 1)}
                         onChange={this.handleMaxParagraphsChange}
                         disabled={!configs.enabled}
                         min={1}
                         max={20}
-                        description="合并多个段落以减少请求次数 (推荐 1-5)"
+                        description={intl.get("ai.maxParagraphsDesc")}
                     />
                     <TextField
-                        label="单次请求最大字符数"
+                        label={intl.get("ai.maxTextLength")}
                         type="number"
                         value={String(configs.maxTextLengthPerRequest || 1500)}
                         onChange={this.handleMaxTextLengthChange}
                         disabled={!configs.enabled}
                         min={100}
                         max={10000}
-                        description="超过限制将强制截断批次"
+                        description={intl.get("ai.maxTextLengthDesc")}
                     />
                 </Stack>
 
                 <TextField
-                    label="自定义摘要提示词 (留空使用默认)"
+                    label={intl.get("ai.summaryPrompt")}
                     multiline
                     rows={3}
                     value={configs.prompts?.summary || ""}
@@ -516,7 +516,7 @@ class AITab extends React.Component<AITabProps, AITabState> {
                     disabled={!configs.enabled}
                 />
                 <TextField
-                    label="自定义翻译提示词 (留空使用默认)"
+                    label={intl.get("ai.translationPrompt")}
                     multiline
                     rows={3}
                     value={configs.prompts?.translation || ""}

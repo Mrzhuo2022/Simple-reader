@@ -338,6 +338,15 @@
         "clearCache": "Clear AI cache",
         "clearCacheConfirm": "Do you really want to clear all AI cache? This will remove all saved summaries and translations.",
         "clearCacheSuccess": "AI cache cleared successfully",
-        "clearCacheFailed": "Failed to clear AI cache"
+        "clearCacheFailed": "Failed to clear AI cache",
+        "advanced": "Advanced",
+        "concurrency": "Concurrency",
+        "concurrencyDesc": "Number of parallel translation requests (recommended 3-5)",
+        "maxParagraphs": "Max paragraphs per request",
+        "maxParagraphsDesc": "Batch paragraphs to reduce request count (recommended 1-5)",
+        "maxTextLength": "Max characters per request",
+        "maxTextLengthDesc": "Batches exceeding this are truncated",
+        "summaryPrompt": "Custom summary prompt (leave empty for default)",
+        "translationPrompt": "Custom translation prompt (leave empty for default)"
     }
 }

@@ -28,7 +28,7 @@ describe("aiClient", () => {
             }
             ;(global.fetch as jest.Mock).mockResolvedValue({
                 ok: true,
-                json: async () => mockResponse,
+                text: async () => JSON.stringify(mockResponse),
             })
 
             const models = await listModels(mockConfig)
@@ -54,6 +54,15 @@ describe("aiClient", () => {
             await expect(listModels(mockConfig)).rejects.toThrow(
                 "Failed to list models: 500 Internal Server Error"
             )
+        })
+
+        it("should give a friendly error when the endpoint returns non-JSON", async () => {
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                text: async () => "<!DOCTYPE html><html><body>Login</body></html>",
+            })
+
+            await expect(listModels(mockConfig)).rejects.toThrow(/did not return JSON/i)
         })
     })
 
