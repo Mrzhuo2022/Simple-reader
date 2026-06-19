@@ -166,10 +166,16 @@ function capContentForSummary(content: string, maxChars = 12000): string {
 export async function summarizeArticle(
     config: AiConfig,
     content: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    summaryLang?: "zh" | "en"
 ): Promise<string> {
-    const isZh = /[\u4e00-\u9fa5]/.test(content)
-    const defaultPrompt = isZh
+    // Decide the summary language: an explicit summaryLang wins; otherwise
+    // detect from the article content. This lets the summary follow the same
+    // translateTarget / translateWhen setting the user configured for
+    // translations, instead of always matching the article's own language.
+    const contentIsZh = /[\u4e00-\u9fa5]/.test(content)
+    const wantZh = summaryLang ? summaryLang === "zh" : contentIsZh
+    const defaultPrompt = wantZh
         ? "用自然的口语帮读者快速了解这篇文章讲了什么，就像跟朋友随口讲一句“这篇文章其实说的是……”那样。一两句话讲清核心观点就好，不要分点、不要小标题、不要套话，不要编造原文没有的内容。"
         : "Tell the reader what this article is actually about in a natural, conversational way — like casually explaining to a friend 'so this piece is basically saying…'. One or two sentences capturing the core point is enough. No bullet points, no headings, no filler, and don't invent anything not in the text."
 
@@ -181,7 +187,7 @@ export async function summarizeArticle(
     // custom prompt is the sole authority on language/style. Use a plain
     // label that works in either language.
     const userContent = capContentForSummary(content)
-    const userLabel = hasCustomPrompt ? "Content" : isZh ? "文章内容" : "Article"
+    const userLabel = hasCustomPrompt ? "Content" : contentIsZh ? "文章内容" : "Article"
     const userMessage = `${userLabel}:\n\n${userContent}`
 
     return await chatCompletion(

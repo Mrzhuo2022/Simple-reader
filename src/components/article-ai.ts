@@ -225,6 +225,19 @@ export class ArticleAIHandler {
                 return
             }
 
+            // Mirror the translation language setting so the summary is written
+            // in the same target language the user configured for translations:
+            //   translateWhen "auto"  -> opposite of the article's language
+            //   anything else         -> the configured translateTarget
+            const articleIsZh = /[\u4e00-\u9fa5]/.test(fullTextResult.content)
+            const translateWhen = aiConfigs.translateWhen || "auto"
+            const summaryLang: "zh" | "en" =
+                translateWhen === "auto"
+                    ? articleIsZh
+                        ? "en"
+                        : "zh"
+                    : (aiConfigs.translateTarget === "en" ? "en" : "zh")
+
             const summary = await summarizeArticle(
                 {
                     baseUrl: aiConfigs.baseUrl,
@@ -233,7 +246,8 @@ export class ArticleAIHandler {
                     prompts: aiConfigs.prompts,
                 },
                 fullTextResult.content,
-                controller.signal
+                controller.signal,
+                summaryLang
             )
 
             if (itemId === String(this.getItem()._id) && this.summaryAbort === controller) {

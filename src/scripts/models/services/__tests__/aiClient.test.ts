@@ -182,6 +182,26 @@ describe("aiClient", () => {
             expect(body.messages[1].content).not.toContain("Article:")
             expect(body.messages[1].content).toContain("An English article about technology.")
         })
+
+        it("should honor an explicit summaryLang over the article's own language", async () => {
+            const mockResponse = {
+                choices: [{ message: { content: "A Chinese summary of English text." } }],
+            }
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => mockResponse,
+            })
+
+            // English article, but summaryLang forces Chinese
+            await summarizeArticle(mockConfig, "An English article about AI.", undefined, "zh")
+
+            const lastCall = (global.fetch as jest.Mock).mock.calls[0]
+            const body = JSON.parse(lastCall[1].body)
+            // Chinese default prompt should be selected despite English content
+            expect(body.messages[0].content).toContain("不要分点")
+            // User wrapper follows the article's language (English -> "Article")
+            expect(body.messages[1].content).toContain("Article:")
+        })
     })
 
     describe("translateText", () => {
