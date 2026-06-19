@@ -38,4 +38,4 @@ const MagazineCard: React.FunctionComponent<CardProps> = props => (
     </div>
 )
 
-export default MagazineCard
+export default React.memo(MagazineCard)

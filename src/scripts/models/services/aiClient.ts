@@ -206,14 +206,15 @@ async function translateBatch(
         return [await translateText(config, texts[0], targetLang, signal)]
     }
 
-    const systemPrompt = `You are a professional translation assistant. 
+    const defaultBatchPrompt = `You are a professional translation assistant.
 Translate the following JSON array of texts into ${
         targetLang === "zh" ? "Simplified Chinese" : "English"
     }.
-Return ONLY a valid JSON array of strings. 
+Return ONLY a valid JSON array of strings.
 Maintain the exact same number of elements.
 Do not wrap the output in markdown code blocks.
 Preserve any HTML tags in the source texts.`
+    const systemPrompt = config.prompts?.translation || defaultBatchPrompt
 
     const content = JSON.stringify(texts)
     const responseRaw = await chatCompletion(
@@ -280,9 +281,11 @@ export async function translateTextByParagraph(
     const targetLang = forcedTargetLang ?? (/[\u4e00-\u9fa5]/.test(sampleText) ? "en" : "zh")
 
     // Configuration
-    const maxBatchSize = config.maxParagraphsPerRequest || 1
-    const maxTextLen = config.maxTextLengthPerRequest || 1500
-    const concurrency = config.concurrency || 5
+    const maxBatchSize = Math.max(1, config.maxParagraphsPerRequest || 1)
+    const maxTextLen = Math.max(1, config.maxTextLengthPerRequest || 1500)
+    // Concurrency must be at least 1, otherwise the active-promise gate
+    // below would loop forever on an empty list (Promise.race([])).
+    const concurrency = Math.max(1, config.concurrency || 5)
 
     // Create batches
     interface Batch {
@@ -320,7 +323,7 @@ export async function translateTextByParagraph(
     const processBatch = async (batch: Batch) => {
         if (signal?.aborted) return
 
-        const maxRetries = 20 // Fewer retries for batches to fail faster? No, keep it robust.
+        const maxRetries = 3 // Fail fast instead of hanging the UI for minutes
         let retryCount = 0
         let success = false
 
@@ -396,11 +399,12 @@ export async function translateTextByParagraph(
             // A simpler way is to wrap the promise to remove itself)
         }
 
-        const p = processBatch(batch).then(() => {
+        const p = processBatch(batch)
+        activePromises.push(p)
+        p.finally(() => {
             const idx = activePromises.indexOf(p)
             if (idx > -1) activePromises.splice(idx, 1)
         })
-        activePromises.push(p)
     }
 
     // Wait for all remaining

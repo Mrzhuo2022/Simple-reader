@@ -140,9 +140,12 @@ class AITab extends React.Component<AITabProps, AITabState> {
         newValue?: string
     ) => {
         const val = parseInt(newValue || "5", 10)
+        // Clamp to >=1: concurrency of 0 would hang the batch translator
+        // (its active-promise gate loops forever on an empty list).
+        const safe = isNaN(val) ? 5 : Math.max(1, val)
         this.setState(
             prevState => ({
-                configs: { ...prevState.configs, concurrency: isNaN(val) ? 5 : val },
+                configs: { ...prevState.configs, concurrency: safe },
             }),
             this.saveConfigs
         )
@@ -153,9 +156,10 @@ class AITab extends React.Component<AITabProps, AITabState> {
         newValue?: string
     ) => {
         const val = parseInt(newValue || "1500", 10)
+        const safe = isNaN(val) ? 1500 : Math.max(1, val)
         this.setState(
             prevState => ({
-                configs: { ...prevState.configs, maxTextLengthPerRequest: isNaN(val) ? 1500 : val },
+                configs: { ...prevState.configs, maxTextLengthPerRequest: safe },
             }),
             this.saveConfigs
         )
@@ -166,9 +170,10 @@ class AITab extends React.Component<AITabProps, AITabState> {
         newValue?: string
     ) => {
         const val = parseInt(newValue || "1", 10)
+        const safe = isNaN(val) ? 1 : Math.max(1, val)
         this.setState(
             prevState => ({
-                configs: { ...prevState.configs, maxParagraphsPerRequest: isNaN(val) ? 1 : val },
+                configs: { ...prevState.configs, maxParagraphsPerRequest: safe },
             }),
             this.saveConfigs
         )
@@ -222,7 +227,7 @@ class AITab extends React.Component<AITabProps, AITabState> {
                 testing: false,
                 message: {
                     type: MessageBarType.error,
-                    text: `${intl.get("ai.testFailed")}: ${error.message}`,
+                    text: `${intl.get("ai.testFailed")}: ${(error as Error)?.message || String(error)}`,
                 },
             })
         }
@@ -283,7 +288,7 @@ class AITab extends React.Component<AITabProps, AITabState> {
                 loadingModels: false,
                 message: {
                     type: MessageBarType.error,
-                    text: `${intl.get("ai.refreshFailed")}: ${error.message}`,
+                    text: `${intl.get("ai.refreshFailed")}: ${(error as Error)?.message || String(error)}`,
                 },
             })
         }
@@ -312,7 +317,7 @@ class AITab extends React.Component<AITabProps, AITabState> {
             this.setState({
                 message: {
                     type: MessageBarType.error,
-                    text: `${intl.get("ai.clearCacheFailed")}: ${error.message}`,
+                    text: `${intl.get("ai.clearCacheFailed")}: ${(error as Error)?.message || String(error)}`,
                 },
             })
         }

@@ -32,4 +32,4 @@ const CompactCard: React.FunctionComponent<CardProps> = props => (
     </div>
 )
 
-export default CompactCard
+export default React.memo(CompactCard)

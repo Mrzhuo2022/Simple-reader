@@ -191,6 +191,7 @@ class Nav extends React.Component<NavProps, NavState> {
     }
     componentWillUnmount() {
         document.removeEventListener("keydown", this.navShortcutsHandler)
+        if (window.utils.platform === "darwin") window.utils.removeTouchBarEventsListener()
     }
 
     minimize = () => {

@@ -159,9 +159,11 @@ export function dismissItems(): AppThunk {
     return (dispatch, getState) => {
         const state = getState()
         const fid = state.page.feedId
-        const filter = state.feeds[fid].filter
+        const feed = state.feeds[fid]
+        if (!feed) return
+        const filter = feed.filter
         const iids = new Set<number>()
-        for (const iid of state.feeds[fid].iids) {
+        for (const iid of feed.iids) {
             const item = state.items[iid]
             if (!FeedFilter.testItem(filter, item)) {
                 iids.add(iid)

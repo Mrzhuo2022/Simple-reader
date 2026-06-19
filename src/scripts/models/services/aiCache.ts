@@ -27,7 +27,16 @@ function loadCache(): void {
         if (fs.existsSync(cacheFilePath)) {
             const data = fs.readFileSync(cacheFilePath, "utf8")
             const parsed = JSON.parse(data)
-            cacheData = new Map(Object.entries(parsed))
+            // Validate shape: only accept entries that look like AICacheEntry.
+            const valid = new Map<string, AICacheEntry>()
+            for (const [key, value] of Object.entries(parsed)) {
+                if (value && typeof value === "object" && "itemId" in value) {
+                    const entry = value as AICacheEntry
+                    entry.createdAt = typeof entry.createdAt === "number" ? entry.createdAt : Date.now()
+                    valid.set(key, entry)
+                }
+            }
+            cacheData = valid
         }
     } catch (error) {
         console.warn("Failed to load cache:", error)
@@ -46,14 +55,23 @@ function saveCache(): void {
     }
 }
 
+function getOrCreateEntry(itemId: string): AICacheEntry {
+    const existing = cacheData.get(itemId)
+    if (existing) return existing
+    // createdAt records when the entry was FIRST created; later partial
+    // updates (summary/translation/title) must not reset it, otherwise the
+    // TTL-based cleanup in clearOldCache would never expire re-saved entries.
+    const entry: AICacheEntry = { itemId, createdAt: Date.now() }
+    cacheData.set(itemId, entry)
+    return entry
+}
+
 export function saveSummary(itemId: string, summary: string): void {
     if (!cacheFilePath) return
 
     try {
-        const entry = cacheData.get(itemId) || { itemId, createdAt: Date.now() }
+        const entry = getOrCreateEntry(itemId)
         entry.summary = summary
-        entry.createdAt = Date.now()
-        cacheData.set(itemId, entry)
         saveCache()
     } catch (error) {
         console.error("Failed to save summary:", error)
@@ -64,10 +82,8 @@ export function saveTranslation(itemId: string, translation: string): void {
     if (!cacheFilePath) return
 
     try {
-        const entry = cacheData.get(itemId) || { itemId, createdAt: Date.now() }
+        const entry = getOrCreateEntry(itemId)
         entry.translation = translation
-        entry.createdAt = Date.now()
-        cacheData.set(itemId, entry)
         saveCache()
     } catch (error) {
         console.error("Failed to save translation:", error)
@@ -78,10 +94,8 @@ export function saveTitleTranslation(itemId: string, titleTranslation: string): 
     if (!cacheFilePath) return
 
     try {
-        const entry = cacheData.get(itemId) || { itemId, createdAt: Date.now() }
+        const entry = getOrCreateEntry(itemId)
         entry.titleTranslation = titleTranslation
-        entry.createdAt = Date.now()
-        cacheData.set(itemId, entry)
         saveCache()
     } catch (error) {
         console.error("Failed to save title translation:", error)

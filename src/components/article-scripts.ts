@@ -8,6 +8,35 @@
 import intl from "react-intl-universal"
 
 /**
+ * Snippet that sanitizes an arbitrary HTML string produced by the AI model
+ * before it is injected into the article webview. Removes
+ * script/style/iframe/embed/object nodes, strips on* event-handler attributes,
+ * and neutralizes dangerous URL protocols (javascript:/vbscript:/data:) on
+ * href/src/style.
+ *
+ * The snippet assumes the HTML to sanitize is in a local variable named
+ * `html`, and evaluates to the sanitized HTML string.
+ */
+const SANITIZE_HTML_BODY = `(() => {
+    const _tmp = document.createElement('div');
+    _tmp.innerHTML = html;
+    for (const bad of Array.from(_tmp.querySelectorAll('script,style,iframe,embed,object,link,meta,base,form'))) bad.remove();
+    for (const n of Array.from(_tmp.querySelectorAll('*'))) {
+        for (const a of Array.from(n.attributes)) {
+            const lname = a.name.toLowerCase();
+            const val = (a.value || '').trim().toLowerCase();
+            if (/^on/i.test(lname)) { n.removeAttribute(a.name); continue; }
+            if (lname === 'href' || lname === 'src' || lname === 'xlink:href' || lname === 'style' || lname === 'srcset') {
+                if (val.indexOf('javascript:') === 0 || val.indexOf('vbscript:') === 0 || val.indexOf('data:') === 0) {
+                    n.removeAttribute(a.name);
+                }
+            }
+        }
+    }
+    return _tmp.innerHTML;
+})()`
+
+/**
  * Injects code block styling into the WebView
  */
 export function getCodeBlockStylesScript(): string {
@@ -222,17 +251,50 @@ export function getInsertTranslationScript(index: number, translated: string): s
         div.className = 'ai-translation';
         div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
         const html = ${safe};
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        for (const bad of Array.from(tmp.querySelectorAll('script,style,iframe'))) bad.remove();
-        for (const n of Array.from(tmp.querySelectorAll('*'))) {
-            for (const a of Array.from(n.attributes)) {
-                if (/^on/i.test(a.name)) n.removeAttribute(a.name);
-            }
-        }
-        div.innerHTML = tmp.innerHTML;
+        div.innerHTML = ${SANITIZE_HTML_BODY};
         if (el.parentNode) el.parentNode.insertBefore(div, el.nextSibling);
         return true;
+    })()`
+}
+
+/**
+ * Inserts multiple translated paragraphs in a single IPC round-trip.
+ * `items` is an array of { index, translated }. This collapses N
+ * executeScript calls into one during batch translation.
+ */
+export function getInsertTranslationsBatchScript(
+    items: Array<{ index: number; translated: string }>
+): string {
+    const safe = JSON.stringify(items.map(it => ({ index: it.index, translated: String(it.translated || "") })))
+    return `(() => {
+        const items = ${safe};
+        let inserted = 0;
+        for (const item of items) {
+            const el = document.querySelector('[data-ai-para-index="' + item.index + '"]');
+            if (!el) continue;
+            let next = el.nextSibling;
+            while (next) {
+                if (next.nodeType === 1 && next.classList.contains('ai-translation')) {
+                    const toRemove = next;
+                    next = next.nextSibling;
+                    toRemove.remove();
+                    continue;
+                }
+                if (next.nodeType === 3 && !next.textContent.trim()) {
+                    next = next.nextSibling;
+                    continue;
+                }
+                break;
+            }
+            const div = document.createElement('div');
+            div.className = 'ai-translation';
+            div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
+            const html = item.translated;
+            div.innerHTML = ${SANITIZE_HTML_BODY};
+            if (el.parentNode) el.parentNode.insertBefore(div, el.nextSibling);
+            inserted++;
+        }
+        return inserted;
     })()`
 }
 
@@ -253,15 +315,7 @@ export function getAppendGlobalTranslationScript(translated: string): string {
             root.appendChild(box);
         }
         const html = ${safe};
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        for (const bad of Array.from(tmp.querySelectorAll('script,style,iframe'))) bad.remove();
-        for (const n of Array.from(tmp.querySelectorAll('*'))) {
-            for (const a of Array.from(n.attributes)) {
-                if (/^on/i.test(a.name)) n.removeAttribute(a.name);
-            }
-        }
-        box.innerHTML = tmp.innerHTML;
+        box.innerHTML = ${SANITIZE_HTML_BODY};
         return true;
     })()`
 }

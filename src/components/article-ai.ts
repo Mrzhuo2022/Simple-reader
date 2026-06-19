@@ -7,7 +7,7 @@
 import intl from "react-intl-universal"
 import { RSSItem } from "../scripts/models/item"
 import { RSSSource } from "../scripts/models/source"
-import { summarizeArticle, translateTextByParagraph } from "../scripts/models/services/aiClient"
+import { summarizeArticle, translateText, translateTextByParagraph } from "../scripts/models/services/aiClient"
 import type { AiConfig } from "../scripts/models/services/aiClient"
 import { getEffectiveItem as buildEffectiveItem } from "./utils/effective-item"
 import * as ArticleScripts from "./article-scripts"
@@ -48,6 +48,9 @@ export class ArticleAIHandler {
     private summaryAbort?: AbortController
     private translationAbort?: AbortController
     private lastActionItemId?: string
+    // Tracks the in-flight cache load so that auto-run can wait for it
+    // instead of firing a duplicate translate/summary on a cached article.
+    private cacheLoadPromise: Promise<void> = Promise.resolve()
 
     constructor(
         private webviewExecutor: WebViewExecutor,
@@ -60,21 +63,27 @@ export class ArticleAIHandler {
     /**
      * Load AI cache for the current article
      */
-    async loadAICache(): Promise<void> {
+    loadAICache(): Promise<void> {
+        const p = this.doLoadAICache()
+        this.cacheLoadPromise = p
+        return p
+    }
+
+    private async doLoadAICache(): Promise<void> {
         const item = this.getItem()
         const expectedId = String(item._id)
-        
+
         try {
             const cache = await window.settings.getAICache(expectedId)
             if (expectedId !== String(this.getItem()._id)) return
 
             if (cache) {
                 const updates: Partial<ArticleAIState> = {}
-                
+
                 if (cache.summary) {
                     updates.aiSummary = cache.summary
                 }
-                
+
                 if (cache.translation) {
                     try {
                         const translationData: TranslationItem[] = JSON.parse(cache.translation)
@@ -84,7 +93,7 @@ export class ArticleAIHandler {
                                 (t.translated.includes("[翻译失败") ||
                                     t.translated.includes("Translation failed"))
                         )
-                        
+
                         if (hasFailure) {
                             console.warn(
                                 "[ArticleAI] Cached translation contains failure markers, discarding cache."
@@ -99,7 +108,7 @@ export class ArticleAIHandler {
                         console.error("解析翻译缓存失败:", e)
                     }
                 }
-                
+
                 if (Object.keys(updates).length > 0) {
                     this.updateState(updates)
                 }
@@ -110,11 +119,21 @@ export class ArticleAIHandler {
     }
 
     /**
-     * Auto-run AI features if configured
+     * Auto-run AI features if configured.
+     * Waits for the cache load to finish first so that a cached
+     * summary/translation is not re-fetched from the API.
      */
-    maybeAutoRunAI(opts?: { hasSummary?: boolean; hasTranslation?: boolean }): void {
+    async maybeAutoRunAI(opts?: {
+        hasSummary?: boolean
+        hasTranslation?: boolean
+    }): Promise<void> {
         const aiConfigs = window.settings.getAIConfigs() as ExtendedAiConfig
         if (!aiConfigs.enabled || !aiConfigs.apiKey) return
+
+        // Ensure cache has been applied before deciding whether to run.
+        await this.cacheLoadPromise.catch(() => {
+            /* cache failure is non-fatal for auto-run decision */
+        })
 
         const item = this.getItem()
         const currentId = String(item._id)
@@ -271,8 +290,8 @@ export class ArticleAIHandler {
 
             // Translate title (don't wait)
             if (item.title?.trim()) {
-                this.translateTitle(item.title, targetLang, aiConfigs, controller).then(
-                    res => {
+                this.translateTitle(item.title, targetLang, aiConfigs, controller)
+                    .then(res => {
                         if (
                             itemId === String(this.getItem()._id) &&
                             this.translationAbort === controller &&
@@ -284,8 +303,10 @@ export class ArticleAIHandler {
                             }
                             this.saveTranslationCache()
                         }
-                    }
-                )
+                    })
+                    .catch(err => {
+                        console.warn("[AI] Title translation failed:", err?.message || err)
+                    })
             }
 
             // Translate paragraphs
@@ -521,12 +542,14 @@ export class ArticleAIHandler {
         controller: AbortController
     ): Promise<string | null> {
         try {
-            const { translateText } = await import("../scripts/models/services/aiClient")
+            // translateText is already statically imported at the top of this
+            // file; no need for a dynamic import() here.
             return await translateText(
                 {
                     baseUrl: config.baseUrl,
                     apiKey: config.apiKey,
                     defaultModel: config.defaultModel,
+                    prompts: config.prompts,
                 },
                 title,
                 targetLang,
@@ -546,6 +569,38 @@ export class ArticleAIHandler {
         itemId: string,
         runId: number
     ): Promise<void> {
+        // Buffer translated paragraphs and flush in batches to avoid an
+        // N-render / N-IPC storm (one setState + one executeScript per
+        // paragraph). The buffer is drained on a short timer and once more
+        // after the whole translation completes.
+        const pending = new Map<number, string>()
+        let flushTimer: ReturnType<typeof setTimeout> | null = null
+        const isStale = () =>
+            itemId !== String(this.getItem()._id) ||
+            this.translationAbort !== signal ||
+            this.getState().translationRunId !== runId
+
+        const flush = () => {
+            flushTimer = null
+            if (isStale() || pending.size === 0) return
+            const batch = Array.from(pending.entries()).map(([index, translated]) => ({
+                index,
+                translated,
+            }))
+            pending.clear()
+
+            // Apply to React state in a single update.
+            const state = this.getState()
+            const list = [...state.aiTranslation]
+            for (const { index, translated } of batch) {
+                list[index] = { original: texts[index], translated }
+            }
+            this.updateState({ aiTranslation: list })
+
+            // Inject into the webview in a single IPC round-trip.
+            this.insertTranslatedParagraphs(batch)
+        }
+
         await translateTextByParagraph(
             {
                 baseUrl: config.baseUrl,
@@ -554,21 +609,20 @@ export class ArticleAIHandler {
             },
             texts,
             (index, translatedText) => {
-                if (
-                    itemId !== String(this.getItem()._id) ||
-                    this.translationAbort !== signal ||
-                    this.getState().translationRunId !== runId
-                )
-                    return
-                this.insertTranslatedParagraph(index, translatedText)
-                const state = this.getState()
-                const list = [...state.aiTranslation]
-                list[index] = { original: texts[index], translated: translatedText }
-                this.updateState({ aiTranslation: list })
+                if (isStale()) return
+                pending.set(index, translatedText)
+                if (flushTimer) clearTimeout(flushTimer)
+                // ~120ms coalesces bursts of fast callbacks while keeping the
+                // UI feeling responsive (translations appear in small groups).
+                flushTimer = setTimeout(flush, 120)
             },
             signal.signal,
             targetLang
         )
+
+        // Final flush for any buffered results.
+        if (flushTimer) clearTimeout(flushTimer)
+        flush()
     }
 
     private async translateFullContentFallback(
@@ -655,11 +709,15 @@ export class ArticleAIHandler {
         }
     }
 
-    private async insertTranslatedParagraph(index: number, translated: string): Promise<void> {
-        if (!translated || translated.trim().length === 0) return
-        await this.webviewExecutor.executeScript(
-            ArticleScripts.getInsertTranslationScript(index, translated)
-        )
+    private insertTranslatedParagraphs(
+        items: Array<{ index: number; translated: string }>
+    ): void {
+        const valid = items.filter(it => it.translated && it.translated.trim().length > 0)
+        if (valid.length === 0) return
+        // Single IPC call inserts all paragraphs at once.
+        this.webviewExecutor
+            .executeScript(ArticleScripts.getInsertTranslationsBatchScript(valid))
+            .catch(err => console.warn("[AI] batch insert failed:", err))
     }
 
     private async appendGlobalTranslation(translated: string): Promise<void> {

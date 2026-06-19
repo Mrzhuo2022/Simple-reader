@@ -40,4 +40,4 @@ const ListCard: React.FunctionComponent<CardProps> = props => (
     </div>
 )
 
-export default ListCard
+export default React.memo(ListCard)

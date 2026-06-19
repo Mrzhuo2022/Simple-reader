@@ -289,6 +289,8 @@
     "ai": {
         "title": "AI Features Configuration",
         "enable": "Enable AI Features",
+        "fullContentRequired": "This article has no full content available, so a summary cannot be generated.",
+        "fullContentTooShort": "Could not extract enough valid text (the body is too short) to generate a reliable summary.",
         "baseUrl": "API Endpoint",
         "baseUrlDesc": "OpenAI-compatible API base URL, e.g. https://api.openai.com/v1",
         "apiKey": "API Key",

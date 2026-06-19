@@ -280,6 +280,7 @@ export function markAllRead(
         const state = getState()
         if (sids === null) {
             const feed = state.feeds[state.page.feedId]
+            if (!feed) return
             sids = feed.sids
         }
         const action = dispatch(getServiceHooks()).markAllRead?.(sids, date, before)

@@ -21,11 +21,17 @@ export const TranslationPopup = () => {
     const [error, setError] = React.useState<string | null>(null)
 
     React.useEffect(() => {
-        if (!display || !text) return
-
-        setLoading(true)
+        // Reset state whenever the popup target changes. When the popup is
+        // closed (no display/text) we clear stale content so it never flashes
+        // back on the next open. These resets are intentional effect
+        // initialization, not cascading renders.
+        /* eslint-disable react-hooks/set-state-in-effect */
         setError(null)
         setTranslation("")
+        setLoading(false)
+        /* eslint-enable react-hooks/set-state-in-effect */
+
+        if (!display || !text) return
 
         const aiConfigs = window.settings.getAIConfigs()
         if (
@@ -35,7 +41,6 @@ export const TranslationPopup = () => {
             !aiConfigs.baseUrl
         ) {
             setError(intl.get("ai.notEnabled"))
-            setLoading(false)
             return
         }
 
@@ -65,8 +70,6 @@ export const TranslationPopup = () => {
         }
 
         if (!shouldTranslate) {
-            setLoading(false)
-            setTranslation("")
             return
         }
 
@@ -74,6 +77,7 @@ export const TranslationPopup = () => {
             translateWhen === "auto" ? (isZh ? "en" : "zh") : (translateTarget as "zh" | "en")
 
         const controller = new AbortController()
+        setLoading(true)
 
         translateText(
             {

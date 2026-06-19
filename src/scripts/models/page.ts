@@ -194,8 +194,9 @@ export function showItemFromId(iid: number): AppThunk {
     return (dispatch, getState) => {
         const state = getState()
         const item = state.items[iid]
+        if (!item) return
         if (!item.hasRead) dispatch(markRead(item))
-        if (item) dispatch(showItem(null, item))
+        dispatch(showItem(null, item))
     }
 }
 
