@@ -93,10 +93,10 @@ export class TrayManager {
     }
 
     private labelShow(): string {
-        return isZh() ? "显示" : "Show"
+        return isZh() ? "显示窗口" : "Show Window"
     }
     private labelHide(): string {
-        return isZh() ? "隐藏" : "Hide"
+        return isZh() ? "隐藏窗口" : "Hide Window"
     }
     private labelQuit(): string {
         return isZh() ? "退出" : "Quit"
