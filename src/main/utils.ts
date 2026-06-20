@@ -4,6 +4,7 @@ import { WindowManager } from "./window"
 import fs = require("fs")
 import { ImageCallbackTypes, TouchBarTexts } from "../schema-types"
 import { initMainTouchBar } from "./touchbar"
+import { checkForUpdate } from "./updater"
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fontList = require("font-list")
 
@@ -285,4 +286,8 @@ export function setUtilsListeners(manager: WindowManager) {
             disableQuoting: true,
         })
     })
+
+    // Check GitHub for a newer release. Returns { hasUpdate, currentVersion,
+    // latestVersion, releaseUrl }; always resolves (errors -> no update).
+    ipcMain.handle("check-update", () => checkForUpdate())
 }

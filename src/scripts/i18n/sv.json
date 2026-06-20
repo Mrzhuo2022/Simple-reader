@@ -115,7 +115,15 @@
         "version": "Version",
         "shortcuts": "Genvägar",
         "openSource": "Open source",
-        "feedback": "Återkoppling"
+        "feedback": "Återkoppling",
+        "update": {
+            "checking": "Söker efter uppdateringar…",
+            "available": "En ny version v{version} är tillgänglig.",
+            "download": "Hämta",
+            "upToDate": "Du använder den senaste versionen.",
+            "recheck": "Kontrollera igen",
+            "checkFailed": "Kunde inte söka efter uppdateringar."
+        }
     },
     "sources": {
         "serviceWarning": "Källor tillagda eller importerade här, kommer inte att synkroniseras med din tjänst.",

@@ -115,7 +115,15 @@
         "version": "Versão",
         "shortcuts": "Atalhos",
         "openSource": "Código aberto",
-        "feedback": "Feedback"
+        "feedback": "Feedback",
+        "update": {
+            "checking": "Verificando atualizações…",
+            "available": "Uma nova versão v{version} está disponível.",
+            "download": "Baixar",
+            "upToDate": "Você está na versão mais recente.",
+            "recheck": "Verificar novamente",
+            "checkFailed": "Falha ao verificar atualizações."
+        }
     },
     "sources": {
         "serviceWarning": "Fontes importadas ou adicionadas aqui não serão sincronizadas com o seu serviço.",

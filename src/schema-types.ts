@@ -145,4 +145,7 @@ export type SchemaTypes = {
     aiConfigs: AIConfigs
     shortcuts: Shortcuts
     closeToTray: boolean
+    updateLastCheckedAt: number
+    updateLatestVersion: string
+    updateLatestUrl: string
 }

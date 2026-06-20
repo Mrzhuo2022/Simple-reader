@@ -115,7 +115,15 @@
         "version": "버전",
         "shortcuts": "단축키",
         "openSource": "오픈 피드",
-        "feedback": "피드백 제출"
+        "feedback": "피드백 제출",
+        "update": {
+            "checking": "업데이트 확인 중…",
+            "available": "새 버전 v{version}이(가) 있습니다.",
+            "download": "다운로드",
+            "upToDate": "최신 버전입니다.",
+            "recheck": "다시 확인",
+            "checkFailed": "업데이트 확인에 실패했습니다."
+        }
     },
     "sources": {
         "serviceWarning": "여기서 불러오거나 추가한 피드는 연결한 서비스와 동기화되지 않습니다.",

@@ -121,7 +121,15 @@
         "version": "Verze",
         "shortcuts": "Zkratky",
         "openSource": "Otevřený zdrojový kód",
-        "feedback": "Zpětná vazba"
+        "feedback": "Zpětná vazba",
+        "update": {
+            "checking": "Kontrola aktualizací…",
+            "available": "Je dostupná nová verze v{version}.",
+            "download": "Stáhnout",
+            "upToDate": "Používáte nejnovější verzi.",
+            "recheck": "Zkontrolovat znovu",
+            "checkFailed": "Kontrola aktualizací selhala."
+        }
     },
     "sources": {
         "serviceWarning": "Zde importované nebo přidané zdroje nebudou synchronizovány s vaší službou.",

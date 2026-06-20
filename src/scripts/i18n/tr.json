@@ -115,7 +115,15 @@
         "version": "Sürüm",
         "shortcuts": "Kısayollar",
         "openSource": "Açık Kaynak",
-        "feedback": "Geri Bildirim"
+        "feedback": "Geri Bildirim",
+        "update": {
+            "checking": "Güncellemeler kontrol ediliyor…",
+            "available": "Yeni bir v{version} sürümü mevcut.",
+            "download": "İndir",
+            "upToDate": "En son sürümü kullanıyorsunuz.",
+            "recheck": "Tekrar kontrol et",
+            "checkFailed": "Güncellemeler kontrol edilemedi."
+        }
     },
     "sources": {
         "serviceWarning": "Sources imported or added here will not be synced with your service.",

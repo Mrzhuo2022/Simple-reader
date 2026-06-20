@@ -138,7 +138,15 @@
         "version": "Version",
         "shortcuts": "Shortcuts",
         "openSource": "Open source",
-        "feedback": "Feedback"
+        "feedback": "Feedback",
+        "update": {
+            "checking": "Checking for updates…",
+            "available": "A new version v{version} is available.",
+            "download": "Download",
+            "upToDate": "You're on the latest version.",
+            "recheck": "Check again",
+            "checkFailed": "Failed to check for updates."
+        }
     },
     "sources": {
         "serviceWarning": "Sources imported or added here will not be synced with your service.",

@@ -193,7 +193,15 @@
         "shortcuts": "Pikakomennot",
         "sources": "Lähteet",
         "version": "Versio",
-        "writeError": "Tiedostoa kirjoitettaessa tapahtui virhe."
+        "writeError": "Tiedostoa kirjoitettaessa tapahtui virhe.",
+        "update": {
+            "checking": "Tarkistetaan päivityksiä…",
+            "available": "Uusi versio v{version} on saatavilla.",
+            "download": "Lataa",
+            "upToDate": "Käytät uusinta versiota.",
+            "recheck": "Tarkista uudelleen",
+            "checkFailed": "Päivitysten tarkistus epäonnistui."
+        }
     },
     "sources": {
         "add": "Lisää lähde",

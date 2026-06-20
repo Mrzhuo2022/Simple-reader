@@ -115,7 +115,15 @@
         "version": "Version",
         "shortcuts": "Raccourcis",
         "openSource": "Open source",
-        "feedback": "Feedback"
+        "feedback": "Feedback",
+        "update": {
+            "checking": "Recherche de mises à jour…",
+            "available": "Une nouvelle version v{version} est disponible.",
+            "download": "Télécharger",
+            "upToDate": "Vous utilisez la dernière version.",
+            "recheck": "Revérifier",
+            "checkFailed": "Échec de la recherche de mises à jour."
+        }
     },
     "sources": {
         "serviceWarning": "Les sources importées ou ajoutées ici ne seront pas synchronisées avec votre service.",

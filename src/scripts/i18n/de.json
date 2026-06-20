@@ -115,7 +115,15 @@
         "version": "Version",
         "shortcuts": "Verknüpfungen",
         "openSource": "Open Source",
-        "feedback": "Feedback"
+        "feedback": "Feedback",
+        "update": {
+            "checking": "Nach Updates suchen…",
+            "available": "Eine neue Version v{version} ist verfügbar.",
+            "download": "Herunterladen",
+            "upToDate": "Sie verwenden die neueste Version.",
+            "recheck": "Erneut prüfen",
+            "checkFailed": "Update-Prüfung fehlgeschlagen."
+        }
     },
     "sources": {
         "serviceWarning": "Feeds, die hier importiert oder hinzugefügt werden, können nicht mit dem Server synchronisiert werden.",

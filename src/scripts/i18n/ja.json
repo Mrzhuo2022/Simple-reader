@@ -115,7 +115,15 @@
         "version": "バージョン",
         "shortcuts": "ショートカット",
         "openSource": "オープンソース",
-        "feedback": "フィードバック"
+        "feedback": "フィードバック",
+        "update": {
+            "checking": "アップデートを確認中…",
+            "available": "新バージョン v{version} が利用可能です。",
+            "download": "ダウンロード",
+            "upToDate": "最新のバージョンです。",
+            "recheck": "再確認",
+            "checkFailed": "アップデートの確認に失敗しました。"
+        }
     },
     "sources": {
         "serviceWarning": "ここでインポートか追加されるフィードはサーバ側と同期しません。",

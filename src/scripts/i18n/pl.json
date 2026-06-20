@@ -121,7 +121,15 @@
         "version": "Wersja",
         "shortcuts": "Skróty klawiszowe",
         "openSource": "Otwarte źródło",
-        "feedback": "Opinie"
+        "feedback": "Opinie",
+        "update": {
+            "checking": "Sprawdzanie aktualizacji…",
+            "available": "Dostępna jest nowa wersja v{version}.",
+            "download": "Pobierz",
+            "upToDate": "Korzystasz z najnowszej wersji.",
+            "recheck": "Sprawdź ponownie",
+            "checkFailed": "Sprawdzanie aktualizacji nie powiodło się."
+        }
     },
     "sources": {
         "serviceWarning": "Źródła zaimportowane lub dodane w tym miejscu nie będą synchronizowane z twoją usługą.",

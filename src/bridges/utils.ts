@@ -2,11 +2,22 @@ import { ipcRenderer } from "electron"
 import { ImageCallbackTypes, TouchBarTexts, WindowStateListenerType } from "../schema-types"
 import { IObjectWithKey } from "@fluentui/react"
 
+export type UpdateStatus = {
+    hasUpdate: boolean
+    currentVersion: string
+    latestVersion: string
+    releaseUrl: string
+}
+
 const utilsBridge = {
     platform: process.platform,
 
     getVersion: (): string => {
         return ipcRenderer.sendSync("get-version")
+    },
+
+    checkUpdate: async (): Promise<UpdateStatus> => {
+        return (await ipcRenderer.invoke("check-update")) as UpdateStatus
     },
 
     openExternal: (url: string, background = false) => {

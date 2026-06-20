@@ -119,7 +119,15 @@
         "version": "版本",
         "shortcuts": "快捷鍵",
         "openSource": "開源項目",
-        "feedback": "反饋"
+        "feedback": "反饋",
+        "update": {
+            "checking": "正在檢查更新…",
+            "available": "發現新版本 v{version}。",
+            "download": "前往下載",
+            "upToDate": "當前已是最新版本。",
+            "recheck": "重新檢查",
+            "checkFailed": "檢查更新失敗。"
+        }
     },
     "sources": {
         "serviceWarning": "此處匯入或新增的訂閱源將不會與服務端同步",

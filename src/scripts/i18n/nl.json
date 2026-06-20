@@ -115,7 +115,15 @@
         "version": "Versie",
         "shortcuts": "Sneltoetsen",
         "openSource": "Open source",
-        "feedback": "Feedback"
+        "feedback": "Feedback",
+        "update": {
+            "checking": "Controleren op updates…",
+            "available": "Er is een nieuwe versie v{version} beschikbaar.",
+            "download": "Downloaden",
+            "upToDate": "U gebruikt de nieuwste versie.",
+            "recheck": "Opnieuw controleren",
+            "checkFailed": "Updatecontrole mislukt."
+        }
     },
     "sources": {
         "serviceWarning": "Hier toegevoegde of geïmporteerde bronnen worden niet gesynchroniseerd met je dienst.",

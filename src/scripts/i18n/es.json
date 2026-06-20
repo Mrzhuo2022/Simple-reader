@@ -90,7 +90,15 @@
         "version": "Versión",
         "shortcuts": "Atajos",
         "openSource": "Abrir fuente",
-        "feedback": "Reacciones"
+        "feedback": "Reacciones",
+        "update": {
+            "checking": "Buscando actualizaciones…",
+            "available": "Hay una nueva versión v{version} disponible.",
+            "download": "Descargar",
+            "upToDate": "Estás en la última versión.",
+            "recheck": "Comprobar de nuevo",
+            "checkFailed": "Error al buscar actualizaciones."
+        }
     },
     "sources": {
         "untitled": "Fuente",
