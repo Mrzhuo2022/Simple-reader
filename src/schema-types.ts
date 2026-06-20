@@ -144,4 +144,5 @@ export type SchemaTypes = {
     useNeDB: boolean
     aiConfigs: AIConfigs
     shortcuts: Shortcuts
+    closeToTray: boolean
 }

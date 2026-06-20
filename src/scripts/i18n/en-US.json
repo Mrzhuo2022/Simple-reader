@@ -249,6 +249,8 @@
         "frData": "Fluent Reader Data",
         "language": "Display language",
         "defaultView": "Default view",
+        "closeToTray": "Minimize to tray on close",
+        "closeToTrayHint": "When enabled, closing the window keeps the app running in the system tray. Turn off to quit the app when the window is closed.",
         "theme": "Theme",
         "lightTheme": "Light mode",
         "darkTheme": "Dark mode",

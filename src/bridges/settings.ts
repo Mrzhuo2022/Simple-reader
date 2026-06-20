@@ -26,6 +26,13 @@ const settingsBridge = {
         ipcRenderer.invoke("set-menu", state)
     },
 
+    getCloseToTray: (): boolean => {
+        return ipcRenderer.sendSync("get-close-to-tray")
+    },
+    setCloseToTray: (state: boolean) => {
+        ipcRenderer.invoke("set-close-to-tray", state)
+    },
+
     getProxyStatus: (): boolean => {
         return ipcRenderer.sendSync("get-proxy-status")
     },

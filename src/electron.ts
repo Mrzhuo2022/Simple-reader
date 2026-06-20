@@ -110,8 +110,12 @@ const winManager = new WindowManager()
 // the main window. Closing the window hides to tray instead of quitting.
 const trayManager = new TrayManager(winManager)
 // Wire the close-to-tray behaviour: the close button hides the window unless
-// the user explicitly quit from the tray menu (or via Cmd/Ctrl+Q on macOS).
-winManager.shouldHideOnClose = () => !trayManager.isQuitting()
+// the user explicitly quit from the tray menu (or via Cmd/Ctrl+Q on macOS) or
+// has chosen "quit on close" in settings.
+winManager.shouldHideOnClose = () => store.get("closeToTray", true) && !trayManager.isQuitting()
+// Rebuild the tray menu when the locale changes so labels follow the
+// configured language without an app restart.
+store.onDidChange("locale", () => trayManager.refreshMenu())
 
 app.on("window-all-closed", () => {
     if (winManager.hasWindow()) {

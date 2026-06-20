@@ -247,6 +247,8 @@
         "frData": "Fluent Reader数据",
         "language": "界面语言",
         "defaultView": "默认视图",
+        "closeToTray": "关闭时最小化到托盘",
+        "closeToTrayHint": "开启后，关闭窗口时应用将驻留系统托盘继续后台运行（RSS 抓取不中断）。关闭此项则在关闭窗口时直接退出应用。",
         "theme": "应用主题",
         "lightTheme": "浅色模式",
         "darkTheme": "深色模式",

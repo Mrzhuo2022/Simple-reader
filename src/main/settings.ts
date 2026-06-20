@@ -33,6 +33,14 @@ ipcMain.handle("set-menu", (_, state: boolean) => {
     store.set(MENU_STORE_KEY, state)
 })
 
+const CLOSE_TO_TRAY_KEY = "closeToTray"
+ipcMain.on("get-close-to-tray", event => {
+    event.returnValue = store.get(CLOSE_TO_TRAY_KEY, true)
+})
+ipcMain.handle("set-close-to-tray", (_, state: boolean) => {
+    store.set(CLOSE_TO_TRAY_KEY, state)
+})
+
 const PAC_STORE_KEY = "pac"
 const PAC_STATUS_KEY = "pacOn"
 function getProxyStatus() {

@@ -59,10 +59,8 @@ function resolveTrayIconPath(): string | null {
 
 export class TrayManager {
     private tray: Tray | null = null
-    private zh: boolean
 
     constructor(private manager: WindowManager) {
-        this.zh = isZh()
         app.on("ready", () => this.create())
     }
 
@@ -95,13 +93,13 @@ export class TrayManager {
     }
 
     private labelShow(): string {
-        return this.zh ? "显示 Simple Reader" : "Show Simple Reader"
+        return isZh() ? "显示 Simple Reader" : "Show Simple Reader"
     }
     private labelHide(): string {
-        return this.zh ? "隐藏 Simple Reader" : "Hide Simple Reader"
+        return isZh() ? "隐藏 Simple Reader" : "Hide Simple Reader"
     }
     private labelQuit(): string {
-        return this.zh ? "退出" : "Quit"
+        return isZh() ? "退出" : "Quit"
     }
 
     /** Rebuild the context menu — call when window state changes if needed. */

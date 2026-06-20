@@ -28,6 +28,7 @@ type AppTabState = {
     pacStatus: boolean
     pacUrl: string
     themeSettings: ThemeSettings
+    closeToTray: boolean
     itemSize: string
     cacheSize: string
     deleteIndex: string
@@ -40,12 +41,18 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
             pacStatus: window.settings.getProxyStatus(),
             pacUrl: window.settings.getProxy(),
             themeSettings: getThemeSettings(),
+            closeToTray: window.settings.getCloseToTray(),
             itemSize: null,
             cacheSize: null,
             deleteIndex: null,
         }
         this.getItemSize()
         this.getCacheSize()
+    }
+
+    toggleCloseToTray = (_, checked: boolean) => {
+        window.settings.setCloseToTray(checked)
+        this.setState({ closeToTray: checked })
     }
 
     getCacheSize = () => {
@@ -210,6 +217,19 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
                         options={this.defaultViewOptions()}
                         onChanged={this.onDefaultViewChanged}
                         style={{ width: 200 }}
+                    />
+                </Stack.Item>
+            </Stack>
+
+            <Stack horizontal verticalAlign="start">
+                <Stack.Item grow>
+                    <Label>{intl.get("app.closeToTray")}</Label>
+                    <span className="settings-hint">{intl.get("app.closeToTrayHint")}</span>
+                </Stack.Item>
+                <Stack.Item>
+                    <Toggle
+                        checked={this.state.closeToTray}
+                        onChange={this.toggleCloseToTray}
                     />
                 </Stack.Item>
             </Stack>
