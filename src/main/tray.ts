@@ -93,10 +93,10 @@ export class TrayManager {
     }
 
     private labelShow(): string {
-        return isZh() ? "显示 Simple Reader" : "Show Simple Reader"
+        return isZh() ? "显示" : "Show"
     }
     private labelHide(): string {
-        return isZh() ? "隐藏 Simple Reader" : "Hide Simple Reader"
+        return isZh() ? "隐藏" : "Hide"
     }
     private labelQuit(): string {
         return isZh() ? "退出" : "Quit"

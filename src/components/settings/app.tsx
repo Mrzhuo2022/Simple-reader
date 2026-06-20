@@ -224,7 +224,6 @@ class AppTab extends React.Component<AppTabProps, AppTabState> {
             <Stack horizontal verticalAlign="start">
                 <Stack.Item grow>
                     <Label>{intl.get("app.closeToTray")}</Label>
-                    <span className="settings-hint">{intl.get("app.closeToTrayHint")}</span>
                 </Stack.Item>
                 <Stack.Item>
                     <Toggle
