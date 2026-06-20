@@ -702,7 +702,21 @@ class Article extends React.Component<ArticleProps, ArticleState> {
         const h = encodeURIComponent(
             renderToString(
                 <>
-                    <p className="title">{this.props.item.title}</p>
+                    <p className="title">
+                        {this.props.item.link ? (
+                            <a
+                                className="title-link"
+                                href={this.props.item.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={intl.get("article.openOriginal")}
+                            >
+                                {this.props.item.title}
+                            </a>
+                        ) : (
+                            this.props.item.title
+                        )}
+                    </p>
                     <p className="date">
                         {this.props.item.date.toLocaleString(this.props.locale, {
                             hour12: !this.props.locale.startsWith("zh"),

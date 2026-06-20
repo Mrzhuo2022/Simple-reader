@@ -85,6 +85,7 @@
         "dontAutoSummarize": "不自动摘要",
         "autoFullText": "自动抓取全文",
         "dontAutoFullText": "不自动抓取全文",
+        "openOriginal": "打开原文",
         "audio": "音频",
         "audioFailure": "音频加载失败"
     },

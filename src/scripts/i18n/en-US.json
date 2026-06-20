@@ -85,6 +85,7 @@
         "dontAutoSummarize": "Don't auto summarize",
         "autoFullText": "Auto fetch full text",
         "dontAutoFullText": "Don't auto fetch full text",
+        "openOriginal": "Open original article",
         "audio": "Audio",
         "audioFailure": "Failed to load audio"
     },

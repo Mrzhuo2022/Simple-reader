@@ -86,10 +86,24 @@ body.vertical #main {
 }
 
 #main > p.title {
-    font-size: 1.25rem;
-    line-height: 1.75rem;
+    font-size: 1.6rem;
+    line-height: 2.1rem;
     font-weight: 600;
     margin-block-end: 0;
+}
+#main > p.title a.title-link {
+    color: inherit;
+    text-decoration: none;
+    display: inline-block;
+    /* transform avoids layout thrash on hover (font-size changes would push
+       the date line below). */
+    transition: color 0.18s ease, transform 0.18s ease;
+    transform-origin: left center;
+    will-change: transform;
+}
+#main > p.title a.title-link:hover {
+    color: var(--primary, #0078d4);
+    transform: scale(1.02);
 }
 #main > p.date {
     color: var(--gray);
