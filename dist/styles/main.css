@@ -167,6 +167,11 @@ img.favicon.dropdown {
     margin-right: 8px;
     vertical-align: sub;
 }
+/* Edit panel in the sources settings: sits below the list, scrolled into view
+   on selection. A little top spacing separates it from the list above. */
+.sources-edit-panel {
+    margin-top: 12px;
+}
 .ms-DetailsList-contentWrapper {
     max-height: 400px;
     overflow-x: hidden;

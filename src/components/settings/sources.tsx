@@ -17,6 +17,8 @@ import {
     MessageBar,
     MessageBarType,
     Toggle,
+    SearchBox,
+    IconButton,
 } from "@fluentui/react"
 import {
     SourceState,
@@ -28,6 +30,7 @@ import { SourceGroup } from "../../schema-types"
 import { urlTest } from "../../scripts/utils"
 import DangerButton from "../utils/danger-button"
 import SourceIcon from "../utils/source-icon"
+import Time from "../utils/time"
 
 type SourcesTabProps = {
     sources: SourceState
@@ -59,6 +62,9 @@ interface SourcesTabState {
     newSourceIcon: string
     sourceEditOption: string
     showNewSourceOptions: boolean
+    searchQuery: string
+    listCollapsed: boolean
+    message: { type: MessageBarType; text: string } | null
     selectedSource: RSSSource
     selectedSources: RSSSource[]
 }
@@ -71,6 +77,10 @@ const enum EditDropdownKeys {
 
 class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
     selection: Selection
+    // Ref to the edit panel wrapper so we can scroll it into view when a source
+    // is selected — without it the panel sits below the whole list and the user
+    // has to scroll down manually to reach it.
+    editPanelRef = React.createRef<HTMLDivElement>()
 
     constructor(props) {
         super(props)
@@ -84,6 +94,9 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
             newSourceIcon: "",
             sourceEditOption: EditDropdownKeys.Name,
             showNewSourceOptions: false,
+            searchQuery: "",
+            listCollapsed: false,
+            message: null,
             selectedSource: null,
             selectedSources: null,
         }
@@ -112,6 +125,30 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         }
     }
 
+    componentDidUpdate = (_prevProps: SourcesTabProps, prevState: SourcesTabState) => {
+        // When a source becomes selected (single selection), scroll the edit
+        // panel into view so the user does not have to scroll down past the
+        // whole list to reach it. Runs after render so the ref is attached.
+        const justSelected =
+            !prevState.selectedSource && this.state.selectedSource
+        if (justSelected && this.editPanelRef.current) {
+            this.editPanelRef.current.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+            })
+        }
+    }
+
+    componentWillUnmount = () => {
+        // Cancel the pending auto-dismiss timer so it doesn't try to setState
+        // on an unmounted component (e.g. when the settings panel closes while
+        // a success message is still showing).
+        if (this.messageTimer) {
+            clearTimeout(this.messageTimer)
+            this.messageTimer = null
+        }
+    }
+
     columns = (): IColumn[] => [
         {
             key: "favicon",
@@ -127,16 +164,57 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
             key: "name",
             name: intl.get("name"),
             fieldName: "name",
-            minWidth: 200,
+            minWidth: 160,
             data: "string",
             isRowHeader: true,
+            isResizable: true,
         },
         {
             key: "url",
             name: "URL",
             fieldName: "url",
-            minWidth: 280,
+            minWidth: 180,
             data: "string",
+            isResizable: true,
+            onRender: (s: RSSSource) => (
+                <span
+                    title={s.url}
+                    style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        display: "block",
+                    }}
+                >
+                    {s.url}
+                </span>
+            ),
+        },
+        {
+            key: "unreadCount",
+            name: intl.get("sources.unread"),
+            fieldName: "unreadCount",
+            minWidth: 56,
+            maxWidth: 80,
+            isResizable: true,
+            onRender: (s: RSSSource) => (
+                <span style={{ color: s.unreadCount > 0 ? "var(--primary)" : "var(--gray)" }}>
+                    {s.unreadCount > 0 ? s.unreadCount : ""}
+                </span>
+            ),
+        },
+        {
+            key: "lastFetched",
+            name: intl.get("sources.lastFetched"),
+            fieldName: "lastFetched",
+            minWidth: 80,
+            maxWidth: 110,
+            isResizable: true,
+            onRender: (s: RSSSource) => (
+                <span style={{ color: "var(--gray)", fontSize: "0.85em" }}>
+                    <Time date={s.lastFetched} />
+                </span>
+            ),
         },
     ]
 
@@ -148,6 +226,29 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
 
     onSourceEditOptionChange = (_, option: IDropdownOption) => {
         this.setState({ sourceEditOption: option.key as string })
+    }
+
+    onSearchChange = (_, value: string) => {
+        // Typing into the search box should expand the list so the user can see
+        // the filtered results, even if they previously collapsed it.
+        this.setState({ searchQuery: value || "", listCollapsed: false })
+    }
+
+    toggleListCollapsed = () => {
+        this.setState(s => ({ listCollapsed: !s.listCollapsed }))
+    }
+
+    /**
+     * Source list filtered by the current search query (matches name or url,
+     * case-insensitive). Returns all sources when the query is empty.
+     */
+    private filteredSources = (): RSSSource[] => {
+        const all = Object.values(this.props.sources)
+        const q = this.state.searchQuery.trim().toLowerCase()
+        if (!q) return all
+        return all.filter(
+            s => s.name.toLowerCase().includes(q) || s.url.toLowerCase().includes(q)
+        )
     }
 
     fetchFrequencyOptions = (): IDropdownOption[] => [
@@ -291,6 +392,22 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
             newSourceOpenTarget: String(SourceOpenTarget.Local),
             showNewSourceOptions: false,
         })
+        this.showMessage(MessageBarType.success, intl.get("sources.addSuccess"))
+    }
+
+    /**
+     * Shows a transient message bar (auto-dismissed after 3s) to confirm an
+     * action like adding a source, mirroring the pattern in ai.tsx but with
+     * an auto-dismiss so the user isn't left to close success toasts by hand.
+     */
+    private messageTimer: NodeJS.Timeout | null = null
+    showMessage = (type: MessageBarType, text: string) => {
+        if (this.messageTimer) clearTimeout(this.messageTimer)
+        this.setState({ message: { type, text } })
+        this.messageTimer = setTimeout(() => {
+            this.setState({ message: null })
+            this.messageTimer = null
+        }, 3000)
     }
 
     onOpenTargetChange = (_, option: IChoiceGroupOption) => {
@@ -363,7 +480,12 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         })
     }
 
-    render = () => (
+    render = () => {
+        // Compute the filtered list once per render; it's used both for the
+        // DetailsList items and the "no match" empty state, so caching avoids a
+        // double pass over all sources.
+        const filtered = this.filteredSources()
+        return (
         <div className="tab-body">
             {this.props.serviceOn && (
                 <MessageBar messageBarType={MessageBarType.info}>
@@ -386,6 +508,16 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                 </Stack.Item>
             </Stack>
 
+            {this.state.message && (
+                <MessageBar
+                    messageBarType={this.state.message.type}
+                    onDismiss={() => this.setState({ message: null })}
+                    styles={{ root: { marginTop: 8 } }}
+                >
+                    {this.state.message.text}
+                </MessageBar>
+            )}
+
             <form onSubmit={this.addSource}>
                 <Label htmlFor="newUrl">
                     {this.state.showNewSourceOptions
@@ -395,9 +527,15 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                 <Stack horizontal>
                     <Stack.Item grow>
                         <TextField
-                            onGetErrorMessage={v =>
-                                urlTest(v.trim()) ? "" : intl.get("sources.badUrl")
-                            }
+                            onGetErrorMessage={v => {
+                                // Empty is allowed (e.g. right after a successful
+                                // add the field is cleared); only flag a non-empty
+                                // but invalid value so we don't show a spurious
+                                // "bad URL" error on the just-cleared input.
+                                const trimmed = (v || "").trim()
+                                if (!trimmed) return ""
+                                return urlTest(trimmed) ? "" : intl.get("sources.badUrl")
+                            }}
                             validateOnLoad={false}
                             placeholder={intl.get("sources.inputUrl")}
                             value={this.state.newUrl}
@@ -464,16 +602,60 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                 )}
             </form>
 
-            <DetailsList
-                compact={Object.keys(this.props.sources).length >= 10}
-                items={Object.values(this.props.sources)}
-                columns={this.columns()}
-                getKey={s => s.sid}
-                setKey="selected"
-                selection={this.selection}
-                selectionMode={SelectionMode.multiple}
-            />
+            <Stack horizontal verticalAlign="center" styles={{ root: { marginTop: 12, marginBottom: 4 } }}>
+                <Stack.Item grow>
+                    <SearchBox
+                        placeholder={intl.get("sources.search")}
+                        value={this.state.searchQuery}
+                        onChange={this.onSearchChange}
+                        underlined
+                    />
+                </Stack.Item>
+                <Stack.Item>
+                    <IconButton
+                        iconProps={{
+                            iconName: this.state.listCollapsed ? "ChevronDown" : "ChevronUp",
+                        }}
+                        title={
+                            this.state.listCollapsed
+                                ? intl.get("sources.expandList")
+                                : intl.get("sources.collapseList")
+                        }
+                        ariaLabel={intl.get("sources.collapseList")}
+                        onClick={this.toggleListCollapsed}
+                    />
+                </Stack.Item>
+            </Stack>
 
+            {!this.state.listCollapsed && (
+                <>
+                    <DetailsList
+                        compact={Object.keys(this.props.sources).length >= 15}
+                        items={filtered}
+                        columns={this.columns()}
+                        getKey={s => s.sid}
+                        setKey="selected"
+                        selection={this.selection}
+                        selectionMode={SelectionMode.multiple}
+                    />
+                    {this.state.searchQuery && filtered.length === 0 && (
+                        <div
+                            className="empty"
+                            style={{
+                                textAlign: "center",
+                                padding: 16,
+                                color: "var(--gray)",
+                            }}
+                        >
+                            {intl.get("sources.noMatch")}
+                        </div>
+                    )}
+                </>
+            )}
+
+            {/* Edit panel: scrolled into view on selection so editing does not
+                require manually scrolling past the whole source list. */}
+            <div className="sources-edit-panel" ref={this.editPanelRef}>
             {this.state.selectedSource && (
                 <>
                     {this.state.selectedSource.serviceRef && (
@@ -518,9 +700,11 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                             <>
                                 <Stack.Item grow>
                                     <TextField
-                                        onGetErrorMessage={v =>
-                                            urlTest(v.trim()) ? "" : intl.get("sources.badUrl")
-                                        }
+                                        onGetErrorMessage={v => {
+                                            const trimmed = (v || "").trim()
+                                            if (!trimmed) return ""
+                                            return urlTest(trimmed) ? "" : intl.get("sources.badUrl")
+                                        }}
                                         validateOnLoad={false}
                                         placeholder={intl.get("sources.inputUrl")}
                                         value={this.state.newSourceIcon}
@@ -648,8 +832,10 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                         {intl.get("sources.serviceManaged")}
                     </MessageBar>
                 ))}
+            </div>
         </div>
-    )
+        )
+    }
 }
 
 export default SourcesTab

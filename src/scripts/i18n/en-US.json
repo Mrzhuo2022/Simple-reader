@@ -170,7 +170,14 @@
         "selectedMulti": "Selected multiple sources",
         "hidden": "Hide in \"all articles\"",
         "group": "Source group",
-        "groupNone": "Ungrouped"
+        "groupNone": "Ungrouped",
+        "search": "Search sources…",
+        "noMatch": "No matching sources",
+        "unread": "Unread",
+        "lastFetched": "Last fetched",
+        "collapseList": "Collapse list",
+        "expandList": "Expand list",
+        "addSuccess": "Source added successfully"
     },
     "groups": {
         "exist": "This group already exists.",

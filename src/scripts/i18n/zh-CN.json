@@ -168,7 +168,14 @@
         "selectedMulti": "选中多个订阅源",
         "hidden": "从“全部文章”中隐藏",
         "group": "所属分组",
-        "groupNone": "未分组"
+        "groupNone": "未分组",
+        "search": "搜索订阅源…",
+        "noMatch": "没有匹配的订阅源",
+        "unread": "未读",
+        "lastFetched": "上次抓取",
+        "collapseList": "收起列表",
+        "expandList": "展开列表",
+        "addSuccess": "订阅源添加成功"
     },
     "groups": {
         "exist": "该分组已存在",
