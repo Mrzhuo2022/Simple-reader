@@ -3,6 +3,7 @@ import { ThemeSettings, SchemaTypes } from "./schema-types"
 import { store } from "./main/settings"
 import performUpdate from "./main/update-scripts"
 import { WindowManager } from "./main/window"
+import { TrayManager } from "./main/tray"
 
 // 禁用GPU缓存以避免缓存权限错误
 app.commandLine.appendSwitch("disable-gpu-shader-disk-cache")
@@ -42,7 +43,7 @@ if (process.platform === "darwin") {
                     label: "Quit",
                     accelerator: "Command+Q",
                     click: () => {
-                        if (winManager.hasWindow()) winManager.mainWindow.close()
+                        trayManager.quit()
                     },
                 },
             ],
@@ -105,6 +106,12 @@ if (process.platform === "darwin") {
 }
 
 const winManager = new WindowManager()
+// System tray (background icon). Created after window manager so it can drive
+// the main window. Closing the window hides to tray instead of quitting.
+const trayManager = new TrayManager(winManager)
+// Wire the close-to-tray behaviour: the close button hides the window unless
+// the user explicitly quit from the tray menu (or via Cmd/Ctrl+Q on macOS).
+winManager.shouldHideOnClose = () => !trayManager.isQuitting()
 
 app.on("window-all-closed", () => {
     if (winManager.hasWindow()) {
@@ -116,9 +123,11 @@ app.on("window-all-closed", () => {
     if (restarting) {
         restarting = false
         winManager.createWindow()
-    } else {
+    } else if (trayManager.isQuitting()) {
         app.quit()
     }
+    // Otherwise (window closed by user): stay alive in the tray; the user can
+    // reopen via the tray icon or quit via the tray menu.
 })
 
 ipcMain.handle("import-all-settings", (_, configs: SchemaTypes) => {

@@ -9,6 +9,12 @@ import { setUtilsListeners } from "./utils"
 export class WindowManager {
     mainWindow: BrowserWindow = null
     private mainWindowState: windowStateKeeper.State
+    /**
+     * When set, returning true from this callback makes the window's close
+     * button hide-to-tray instead of destroying the window. Used by the tray
+     * integration so the app can keep running in the background.
+     */
+    shouldHideOnClose: () => boolean = () => false
 
     constructor() {
         this.init()
@@ -105,6 +111,16 @@ export class WindowManager {
                         [params.x, params.y],
                         params.selectionText
                     )
+                }
+            })
+            // Hide-to-tray instead of closing when the tray requests it, so the
+            // app keeps running in the background. event.preventDefault() stops
+            // the actual close; the window-all-closed handler checks the tray's
+            // quitting flag before deciding whether to truly quit.
+            this.mainWindow.on("close", event => {
+                if (this.shouldHideOnClose()) {
+                    event.preventDefault()
+                    this.mainWindow.hide()
                 }
             })
         }
