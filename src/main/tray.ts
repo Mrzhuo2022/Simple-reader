@@ -1,5 +1,7 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import path = require("path")
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import fs = require("fs")
 import { app, Menu, Tray, nativeImage } from "electron"
 import { store } from "./settings"
 import { WindowManager } from "./window"
@@ -23,11 +25,36 @@ function isZh(): boolean {
     return locale.toLowerCase().startsWith("zh")
 }
 
-function resolveTrayIcon(): string {
-    // 16x16 is the standard tray size; macOS prefers a template image so the
-    // icon adapts to the menu-bar color. We ship 16/32/64 PNGs under build/icons.
+/**
+ * Resolve a usable tray icon file path. We probe several candidate locations
+ * (the app root differs between dev and packaged builds, and the icon folder
+ * layout varies) and return the first PNG that actually exists on disk. The
+ * Tray constructor rejects empty/undefined images, so we must never hand it
+ * nothing — the last-resort built-in 16x16 nativeImage is used if no file is
+ * found.
+ */
+function resolveTrayIconPath(): string | null {
     const size = process.platform === "darwin" ? "16x16" : "32x32"
-    return path.join(app.getAppPath(), "build", "icons", `${size}.png`)
+    const candidates = [
+        // dev mode: app root is the project dir
+        path.join(app.getAppPath(), "build", "icons", `${size}.png`),
+        path.join(app.getAppPath(), "build", "icon.png"),
+        // packaged: resources may sit beside the asar
+        process.resourcesPath && path.join(process.resourcesPath, "build", "icons", `${size}.png`),
+        process.resourcesPath && path.join(process.resourcesPath, "build", "icon.png"),
+        // relative fallbacks for when getAppPath is the dist dir
+        path.join(app.getAppPath(), "..", "build", "icons", `${size}.png`),
+        path.join(app.getAppPath(), "..", "build", "icon.png"),
+    ].filter(Boolean) as string[]
+
+    for (const candidate of candidates) {
+        try {
+            if (fs.existsSync(candidate)) return candidate
+        } catch {
+            /* ignore, try next */
+        }
+    }
+    return null
 }
 
 export class TrayManager {
@@ -40,17 +67,24 @@ export class TrayManager {
     }
 
     private create(): void {
-        let icon
-        try {
-            icon = nativeImage.createFromPath(resolveTrayIcon())
-            if (icon.isEmpty()) icon = undefined
-        } catch {
-            icon = undefined
+        const iconPath = resolveTrayIconPath()
+        let icon: Electron.NativeImage
+        if (iconPath) {
+            icon = nativeImage.createFromPath(iconPath)
+        }
+        if (!icon || icon.isEmpty()) {
+            // Absolute last resort: a 1x1 transparent image so Tray() never
+            // throws "Argument must be a file path or a NativeImage". The
+            // tooltip + context menu still identify the app.
+            icon = nativeImage.createEmpty()
+            // createEmpty returns an empty (0x0) image which some platforms
+            // also reject; resize to 1x1 to be safe.
+            icon = icon.resize({ width: 16, height: 16 })
         }
 
         this.tray = new Tray(icon)
         // On macOS a template image adapts to light/dark menu bar.
-        if (process.platform === "darwin" && icon) icon.setTemplateImage(true)
+        if (process.platform === "darwin") icon.setTemplateImage(true)
 
         this.tray.setToolTip("Simple Reader")
 

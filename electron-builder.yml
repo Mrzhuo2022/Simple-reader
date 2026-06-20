@@ -5,6 +5,12 @@ files:
     - "./dist/**/*"
     - "!./dist/fontlist"
     - "!**/*.js.map"
+# Ship the tray/app icons outside the asar so the main process can read them
+# via process.resourcesPath in packaged builds (asar contents aren't on disk).
+extraResources:
+    - from: "./build/icons"
+      to: "build/icons"
+      filter: ["**/*.png"]
 directories:
     output: "./bin/${platform}/${arch}/"
 mac:
