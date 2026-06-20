@@ -367,7 +367,13 @@ export async function translateTextByParagraph(
         batches.push(currentBatch)
     }
 
-    // Helper for concurrency limitation
+    // Helper for concurrency limitation.
+    //
+    // processBatch MUST NOT reject except on an abort: a rejected promise
+    // would propagate out of Promise.all() below and discard every other
+    // batch's already-translated paragraphs. So any non-abort failure is
+    // caught, retried, and on exhaustion turned into a "[翻译失败]" marker so
+    // the rest of the article still comes through.
     const processBatch = async (batch: Batch) => {
         if (signal?.aborted) return
 
@@ -376,7 +382,7 @@ export async function translateTextByParagraph(
         let success = false
 
         while (!success) {
-            if (signal?.aborted) throw new Error("Aborted")
+            if (signal?.aborted) return
 
             try {
                 const translatedTexts = await translateBatch(
@@ -387,14 +393,15 @@ export async function translateTextByParagraph(
                 )
 
                 // Validation：如果翻译结果包含“翻译失败/translation failed”等提示，则记录明确的段落索引并触发重试
-                translatedTexts.forEach((t, idx) => {
+                for (let idx = 0; idx < translatedTexts.length; idx++) {
+                    const t = translatedTexts[idx]
                     if (/(?:\[\s*翻译失败\s*\]|翻译失败|translation\s*failed)/i.test(t)) {
                         const paragraphIndex = batch.indices[idx]
-                        // 与单测保持一致：仅传入一条包含段落信息的字符串
                         console.warn(`Translation failed for paragraph ${paragraphIndex}`)
+                        // Trigger retry by throwing; the catch below handles it.
                         throw new Error("Content verification failed: " + t)
                     }
-                })
+                }
 
                 // Update results and notify
                 batch.indices.forEach((originalIndex, batchIndex) => {
@@ -408,9 +415,13 @@ export async function translateTextByParagraph(
                 success = true
             } catch (error) {
                 const err = error as Error & { name?: string }
-                if (err.name === "AbortError" || err.message?.includes("Abort")) {
-                    throw error
-                }
+                const aborted =
+                    err?.name === "AbortError" ||
+                    (typeof err?.message === "string" && err.message.includes("Abort"))
+                // Only an abort should ever propagate out of this function —
+                // and only when the signal is *actually* aborted, otherwise we
+                // just keep retrying.
+                if (aborted && signal?.aborted) return
 
                 retryCount++
                 if (retryCount > maxRetries) {
@@ -439,17 +450,21 @@ export async function translateTextByParagraph(
         }
     }
 
-    // Execute batches with concurrency limit
+    // Execute batches with concurrency limit. processBatch never rejects
+    // (aborts just resolve silently), so we can race/wait without a try/catch
+    // guard. Using Promise.allSettled semantics here would also be safe and
+    // keeps any unexpected throw from taking down the whole run.
     const activePromises: Promise<void>[] = []
     for (const batch of batches) {
         if (signal?.aborted) break
 
         // If we reached concurrency limit, wait for one to finish
         while (activePromises.length >= concurrency) {
-            await Promise.race(activePromises)
-            // Remove finished promises
-            // (Actually Promise.race just returns, we need to clean up the list.
-            // A simpler way is to wrap the promise to remove itself)
+            // processBatch resolves on success, abort, or retry exhaustion —
+            // never rejects — so Promise.race here cannot throw in practice.
+            await Promise.race(activePromises).catch(() => {
+                /* defensive: never let one bad batch abort the scheduler */
+            })
         }
 
         const p = processBatch(batch)
@@ -460,8 +475,9 @@ export async function translateTextByParagraph(
         })
     }
 
-    // Wait for all remaining
-    await Promise.all(activePromises)
+    // Wait for all remaining. allSettled so a stray reject (shouldn't happen)
+    // doesn't discard the results we already collected.
+    await Promise.allSettled(activePromises)
 
     return results
 }

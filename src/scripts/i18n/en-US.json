@@ -84,7 +84,9 @@
         "autoSummarize": "Auto summarize",
         "dontAutoSummarize": "Don't auto summarize",
         "autoFullText": "Auto fetch full text",
-        "dontAutoFullText": "Don't auto fetch full text"
+        "dontAutoFullText": "Don't auto fetch full text",
+        "audio": "Audio",
+        "audioFailure": "Failed to load audio"
     },
     "context": {
         "share": "Share",
@@ -341,6 +343,7 @@
         "clearCacheConfirm": "Do you really want to clear all AI cache? This will remove all saved summaries and translations.",
         "clearCacheSuccess": "AI cache cleared successfully",
         "clearCacheFailed": "Failed to clear AI cache",
+        "translationFailedHint": "Translation failed for this paragraph — click to retry",
         "advanced": "Advanced",
         "concurrency": "Concurrency",
         "concurrencyDesc": "Number of parallel translation requests (recommended 3-5)",

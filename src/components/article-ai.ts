@@ -52,6 +52,11 @@ export class ArticleAIHandler {
     // Tracks the in-flight cache load so that auto-run can wait for it
     // instead of firing a duplicate translate/summary on a cached article.
     private cacheLoadPromise: Promise<void> = Promise.resolve()
+    // Polling handle for the "click a failed paragraph to retry" affordance.
+    // Started after a translation run that contains failures; cleared on
+    // cleanup / item change.
+    private retryPollHandle: ReturnType<typeof setInterval> | null = null
+    private retrying = false
 
     constructor(
         private webviewExecutor: WebViewExecutor,
@@ -382,6 +387,10 @@ export class ArticleAIHandler {
                 this.updateState({ translationLoading: false })
                 await this.webviewExecutor.executeScript(ArticleScripts.getTranslationSpinnerScript(false))
                 await this.saveTranslationCache()
+                // If some paragraphs failed, start watching for the user
+                // clicking the "retry" hint so we can re-run just the failed
+                // ones (successful paragraphs come back from cache).
+                if (this.hasFailedTranslations()) this.startRetryWatcher()
             }
         } catch (error) {
             this.handleTranslationError(error, itemId, controller, newRunId)
@@ -499,6 +508,66 @@ export class ArticleAIHandler {
     cleanup(): void {
         if (this.summaryAbort) this.summaryAbort.abort()
         if (this.translationAbort) this.translationAbort.abort()
+        this.stopRetryWatcher()
+    }
+
+    /** Whether the current state has any paragraph marked as failed. */
+    private hasFailedTranslations(): boolean {
+        return this.getState().aiTranslation.some(
+            t =>
+                t &&
+                typeof t.translated === "string" &&
+                (t.translated.includes("[翻译失败") ||
+                    t.translated.includes("Translation failed"))
+        )
+    }
+
+    /**
+     * Polls the webview for the "user clicked a failed-paragraph hint" flag.
+     * When set, re-runs translation. Successful paragraphs are served from
+     * cache by translateArticle's normal flow; only the failed ones hit the
+     * API again.
+     */
+    private startRetryWatcher(): void {
+        this.stopRetryWatcher()
+        this.retryPollHandle = setInterval(() => {
+            if (this.retrying) return
+            this.webviewExecutor
+                .executeScript<boolean>(ArticleScripts.getFailedRetryFlagScript())
+                .then(clicked => {
+                    if (!clicked) return
+                    if (this.retrying) return
+                    this.retrying = true
+                    // Clear the failed markers from React state so the next
+                    // run re-fetches those paragraphs; keep the good ones.
+                    const kept = this.getState().aiTranslation.filter(
+                        t =>
+                            t &&
+                            !(
+                                typeof t.translated === "string" &&
+                                (t.translated.includes("[翻译失败") ||
+                                    t.translated.includes("Translation failed"))
+                            )
+                    )
+                    this.updateState({ aiTranslation: kept, translationLoading: true })
+                    this.translateArticle()
+                        .catch(err => console.warn("[AI] retry translation failed:", err))
+                        .finally(() => {
+                            this.retrying = false
+                        })
+                })
+                .catch(() => {
+                    /* webview not ready / gone — ignore, polling continues */
+                })
+        }, 1000)
+    }
+
+    private stopRetryWatcher(): void {
+        if (this.retryPollHandle) {
+            clearInterval(this.retryPollHandle)
+            this.retryPollHandle = null
+        }
+        this.retrying = false
     }
 
     // --- Private Helper Methods ---

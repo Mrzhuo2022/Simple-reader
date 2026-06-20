@@ -64,6 +64,17 @@ describe("aiClient", () => {
 
             await expect(listModels(mockConfig)).rejects.toThrow(/did not return JSON/i)
         })
+
+        it("should accept a bare array of models as a fallback format", async () => {
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                text: async () => JSON.stringify([{ id: "a" }, { name: "b" }, {}]),
+            })
+
+            const models = await listModels(mockConfig)
+            // Falls back to Array.isArray branch, picking id || name and dropping empties.
+            expect(models).toEqual(["a", "b"])
+        })
     })
 
     describe("chatCompletion", () => {
@@ -94,6 +105,30 @@ describe("aiClient", () => {
                     }),
                 })
             )
+        })
+
+        it("should throw including the response body on a non-ok response", async () => {
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: false,
+                status: 429,
+                statusText: "Too Many Requests",
+                text: async () => "rate limited",
+            })
+
+            await expect(
+                chatCompletion(mockConfig, { messages: [] })
+            ).rejects.toThrow(/Chat completion failed: 429/)
+        })
+
+        it("should throw when the response has no choices", async () => {
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => ({}),
+            })
+
+            await expect(
+                chatCompletion(mockConfig, { messages: [] })
+            ).rejects.toThrow(/Invalid response format/)
         })
     })
 
@@ -267,6 +302,105 @@ describe("aiClient", () => {
             )
 
             consoleSpy.mockRestore()
+        })
+
+        it("should mark a paragraph [翻译失败] after retries are exhausted, without losing other paragraphs", async () => {
+            // Two paragraphs. Paragraph "hello" fails forever (its batch always
+            // returns a failure marker); paragraph "world" succeeds on the
+            // first try. After retry exhaustion "hello" must carry the failure
+            // marker while "world" keeps its real translation — i.e. one bad
+            // batch must not discard results from other batches.
+            const consoleSpy = jest.spyOn(console, "warn").mockImplementation()
+            const failContent = "Translation failed: upstream error"
+            const okContent = "好的"
+
+            ;(global.fetch as jest.Mock).mockImplementation((_url: string, init: { body?: string }) => {
+                const body = JSON.parse(init.body || "{}")
+                // Batch endpoint sends a JSON array of texts in the user
+                // message; single-text path sends the raw paragraph. Either
+                // way, peek at the user content to tell paragraphs apart.
+                const messages = (body.messages || []) as Array<{
+                    role: string
+                    content: string
+                }>
+                const userMsg = messages.find(m => m.role === "user")?.content || ""
+                const isHello =
+                    typeof userMsg === "string" &&
+                    (userMsg.includes("hello") || userMsg.includes('"hello"'))
+
+                return Promise.resolve({
+                    ok: true,
+                    json: async () => ({
+                        choices: [
+                            {
+                                message: {
+                                    content: isHello
+                                        ? failContent
+                                        : userMsg.includes("[")
+                                        ? '["' + okContent + '"]'
+                                        : okContent,
+                                },
+                            },
+                        ],
+                    }),
+                })
+            })
+
+            const results = await translateTextByParagraph(mockConfig, ["hello", "world"])
+            const translations = results.map(r => r.translated)
+
+            // The failed paragraph must be marked, the other must be the real
+            // translation.
+            expect(translations).toContain("[翻译失败]")
+            expect(translations).toContain(okContent)
+            // Every paragraph slot is filled (no blank gaps from a thrown batch).
+            expect(translations.every(t => t.length > 0)).toBe(true)
+            expect(results).toHaveLength(2)
+
+            consoleSpy.mockRestore()
+        })
+
+        it("must not reject when aborted — aborted batches resolve silently", async () => {
+            // Aborts happen mid-flight. The fix ensures processBatch returns
+            // (rather than throwing) on abort, so the outer scheduler/Promise.all
+            // does not reject. Pending paragraphs simply stay empty.
+            const controller = new AbortController()
+            controller.abort()
+
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => ({ choices: [{ message: { content: "x" } }] }),
+            })
+
+            const results = await translateTextByParagraph(
+                mockConfig,
+                ["a", "b", "c"],
+                undefined,
+                controller.signal
+            )
+
+            // No rejection, results array intact, translations empty (aborted
+            // before any batch completed).
+            expect(results).toHaveLength(3)
+            expect(results.every(r => r.translated === "")).toBe(true)
+        })
+
+        it("should batch multiple paragraphs into a single request when maxParagraphsPerRequest allows", async () => {
+            // Use a config that allows 2 paragraphs per request and stub the
+            // batched JSON response shape.
+            const batchConfig: AiConfig = { ...mockConfig, maxParagraphsPerRequest: 2 }
+            ;(global.fetch as jest.Mock).mockResolvedValue({
+                ok: true,
+                json: async () => ({
+                    choices: [{ message: { content: '["一","二"]' } }],
+                }),
+            })
+
+            const results = await translateTextByParagraph(batchConfig, ["one", "two"])
+            expect(results.map(r => r.translated)).toEqual(["一", "二"])
+
+            // Exactly one fetch call for the whole batch.
+            expect((global.fetch as jest.Mock).mock.calls.length).toBe(1)
         })
     })
 })

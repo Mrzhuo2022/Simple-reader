@@ -264,6 +264,11 @@ export function getMarkParagraphsScript(): string {
  */
 export function getInsertTranslationScript(index: number, translated: string): string {
     const safe = JSON.stringify(String(translated || ""))
+    const failedRe = FAILED_RE.source
+    const failedLabel = JSON.stringify(
+        intl.get("ai.translationFailedHint") ||
+            "此段翻译失败，点此重试 / Translation failed for this paragraph — click to retry"
+    )
     return `(() => {
         const el = document.querySelector('[data-ai-para-index="' + ${index} + '"]');
         if (!el) {
@@ -287,25 +292,56 @@ export function getInsertTranslationScript(index: number, translated: string): s
         }
         const div = document.createElement('div');
         div.className = 'ai-translation';
-        div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
-        const html = ${safe};
-        div.innerHTML = ${SANITIZE_HTML_BODY};
+        const failedRe = new RegExp(${JSON.stringify(failedRe)}, 'i');
+        const failedLabel = ${failedLabel};
+        const text = ${safe};
+        if (failedRe.test(text)) {
+            div.classList.add('ai-translation-failed');
+            div.style.cssText = 'color:var(--messageDanger,#d13438);font-size:0.85em;margin:4px 0 12px 0;padding:6px 10px;border-left:3px solid var(--messageDanger,#d13438);background:rgba(209,52,56,0.06);border-radius:3px;cursor:pointer;opacity:0.9;';
+            div.textContent = failedLabel;
+            div.title = failedLabel;
+            div.addEventListener('click', () => {
+                window.__aiRetryFailed = true;
+                div.textContent = failedLabel + ' …';
+            });
+        } else {
+            div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
+            const html = text;
+            div.innerHTML = ${SANITIZE_HTML_BODY};
+        }
         if (el.parentNode) el.parentNode.insertBefore(div, el.nextSibling);
         return true;
     })()`
 }
 
+// Detects whether a translated string is a failure marker. Mirrors the
+// markers written by translateTextByParagraph in aiClient.ts.
+const FAILED_RE = /\[\s*翻译失败\s*\]|\[\s*Translation failed\s*\]|翻译失败|translation\s*failed/i
+
 /**
  * Inserts multiple translated paragraphs in a single IPC round-trip.
  * `items` is an array of { index, translated }. This collapses N
  * executeScript calls into one during batch translation.
+ *
+ * Failure markers ("[翻译失败]" / "[Translation failed]") are rendered as a
+ * distinct, clickable hint instead of plain text so the user knows that
+ * specific paragraph failed and can re-run translation to retry it.
  */
 export function getInsertTranslationsBatchScript(
     items: Array<{ index: number; translated: string }>
 ): string {
-    const safe = JSON.stringify(items.map(it => ({ index: it.index, translated: String(it.translated || "") })))
+    const safe = JSON.stringify(
+        items.map(it => ({ index: it.index, translated: String(it.translated || "") }))
+    )
+    const failedRe = FAILED_RE.source
+    const failedLabel = JSON.stringify(
+        intl.get("ai.translationFailedHint") ||
+            "此段翻译失败，点此重试 / Translation failed for this paragraph — click to retry"
+    )
     return `(() => {
         const items = ${safe};
+        const failedRe = new RegExp(${JSON.stringify(failedRe)}, 'i');
+        const failedLabel = ${failedLabel};
         let inserted = 0;
         for (const item of items) {
             const el = document.querySelector('[data-ai-para-index="' + item.index + '"]');
@@ -326,13 +362,41 @@ export function getInsertTranslationsBatchScript(
             }
             const div = document.createElement('div');
             div.className = 'ai-translation';
-            div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
-            const html = item.translated;
-            div.innerHTML = ${SANITIZE_HTML_BODY};
+            const isFailed = failedRe.test(item.translated || '');
+            if (isFailed) {
+                div.classList.add('ai-translation-failed');
+                div.style.cssText = 'color:var(--messageDanger,#d13438);font-size:0.85em;margin:4px 0 12px 0;padding:6px 10px;border-left:3px solid var(--messageDanger,#d13438);background:rgba(209,52,56,0.06);border-radius:3px;cursor:pointer;opacity:0.9;';
+                div.textContent = failedLabel;
+                div.title = failedLabel;
+                div.addEventListener('click', () => {
+                    // Signal the host: re-run translation. The host polls this
+                    // flag via getFailedRetryFlagScript after a click lands.
+                    window.__aiRetryFailed = true;
+                    div.textContent = failedLabel + ' …';
+                });
+            } else {
+                div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
+                const html = item.translated;
+                div.innerHTML = ${SANITIZE_HTML_BODY};
+            }
             if (el.parentNode) el.parentNode.insertBefore(div, el.nextSibling);
             inserted++;
         }
         return inserted;
+    })()`
+}
+
+/**
+ * Reads and clears the per-webview "user clicked retry on a failed paragraph"
+ * flag. The host calls this on a short interval while a translation is shown
+ * so it can re-run translation (which only re-fetches the failed paragraphs
+ * since successful ones are served from cache).
+ */
+export function getFailedRetryFlagScript(): string {
+    return `(() => {
+        const v = !!window.__aiRetryFailed;
+        window.__aiRetryFailed = false;
+        return v;
     })()`
 }
 
