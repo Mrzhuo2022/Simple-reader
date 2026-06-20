@@ -8,6 +8,22 @@ import { FeedActionTypes, INIT_FEED, LOAD_MORE, dismissItems } from "./feed"
 import { pushNotification, setupAutoFetch, SettingsActionTypes, FREE_MEMORY } from "./app"
 import { getServiceHooks, syncWithService, ServiceActionTypes, SYNC_LOCAL_ITEMS } from "./service"
 
+/** A media enclosure attached to an RSS item (most commonly podcast audio). */
+export interface ItemEnclosure {
+    url: string
+    type?: string
+    length?: number
+}
+
+/** Returns true when the enclosure is playable audio the UI can render. */
+export function isAudioEnclosure(enc?: ItemEnclosure): boolean {
+    if (!enc || !enc.url) return false
+    // Trust the declared MIME type when present; otherwise fall back to the
+    // common audio file extensions so feeds that omit the type still work.
+    if (enc.type) return enc.type.toLowerCase().startsWith("audio/")
+    return /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac)(\?|#|$)/i.test(enc.url)
+}
+
 export class RSSItem {
     _id: number
     source: number
@@ -27,6 +43,9 @@ export class RSSItem {
     autoSummarize?: boolean
     autoFullText?: boolean
     serviceRef?: string
+    // Media enclosure (e.g. podcast audio). Only populated for media the
+    // reader can do something with; everything else is dropped on parse.
+    enclosure?: ItemEnclosure
 
     constructor(item: MyParserItem, source: RSSSource) {
         for (const field of ["title", "link", "creator"]) {
@@ -45,7 +64,7 @@ export class RSSItem {
         this.notify = false
     }
 
-    static parseContent(item: RSSItem, parsed: MyParserItem) {
+    static parseContent(item: RSSItem, parsed: MyParserItem, source?: RSSSource) {
         for (const field of ["thumb", "content", "fullContent"]) {
             const content = parsed[field]
             if (content && typeof content !== "string") delete parsed[field]
@@ -57,8 +76,28 @@ export class RSSItem {
             item.content = parsed.content || ""
             item.snippet = htmlDecode(parsed.contentSnippet || "")
         }
+        // Pick up a media enclosure (typically podcast audio) early, because
+        // the cover fallback below needs to know whether this is an audio
+        // item. Only keep it when it carries a usable http(s) url; relative/
+        // broken enclosures are dropped so the UI never tries to play garbage.
+        const enc = parsed.enclosure
+        if (enc?.url && /^https?:\/\//i.test(enc.url)) {
+            item.enclosure = {
+                url: enc.url,
+                type: typeof enc.type === "string" ? enc.type : undefined,
+                length: typeof enc.length === "number" ? enc.length : undefined,
+            }
+        }
         if (parsed.thumb) {
             item.thumb = parsed.thumb
+        } else if (parsed.itunes?.image) {
+            // Podcast episode cover from <itunes:image href="..."/>. rss-parser
+            // normalizes this to a plain URL string on item.itunes.image.
+            item.thumb = parsed.itunes.image
+        } else if (parsed.itunesImage?.[0]?.$?.href) {
+            // Fallback to the raw custom-field form (attribute node) if the
+            // builtin normalization did not run for this feed.
+            item.thumb = parsed.itunesImage[0].$.href
         } else if (parsed.image?.$?.url) {
             item.thumb = parsed.image.$.url
         } else if (parsed.image && typeof parsed.image === "string") {
@@ -72,8 +111,25 @@ export class RSSItem {
             const baseEl = dom.createElement("base")
             baseEl.setAttribute("href", item.link.split("/").slice(0, 3).join("/"))
             dom.head.append(baseEl)
-            const img = dom.querySelector("img")
-            if (img && img.src) item.thumb = img.src
+            // Skip tracking pixels / spacers (width="1" or height="1") when
+            // scanning the article body for a cover image — otherwise the
+            // card renders a blank 144px header for an invisible 1x1 gif.
+            const imgs = dom.querySelectorAll("img")
+            for (const img of Array.from(imgs)) {
+                if (img.getAttribute("width") === "1" || img.getAttribute("height") === "1") {
+                    continue
+                }
+                if (img.src) {
+                    item.thumb = img.src
+                    break
+                }
+            }
+        }
+        // Final cover fallback: an audio item with no per-episode image uses
+        // the feed's podcast logo (source.image). Keeps podcast cards from
+        // showing a blank header just because the episode had no artwork.
+        if (!item.thumb && source?.image && isAudioEnclosure(item.enclosure)) {
+            item.thumb = source.image
         }
         if (item.thumb && !item.thumb.startsWith("https://") && !item.thumb.startsWith("http://")) {
             delete item.thumb

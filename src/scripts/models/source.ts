@@ -48,6 +48,10 @@ export class RSSSource {
     rules?: SourceRule[]
     textDir: SourceTextDirection
     hidden: boolean
+    // High-resolution feed image (e.g. a podcast logo from <itunes:image>).
+    // Used as the cover fallback for audio items that have no per-episode
+    // thumbnail. Distinct from iconurl, which is a small favicon.
+    image?: string
 
     constructor(url: string, name: string = null) {
         this.url = url
@@ -64,6 +68,13 @@ export class RSSSource {
         if (!source.name) {
             if (feed.title) source.name = feed.title.trim()
             source.name = source.name || intl.get("sources.untitled")
+        }
+        // Capture the feed-level cover image (podcast logo). rss-parser exposes
+        // it as feed.itunes.image; the iTunes namespace block always runs for
+        // RSS 2.0 feeds so feed.itunes exists, but image may be undefined.
+        const feedItunes = (feed as { itunes?: { image?: string } }).itunes
+        if (feedItunes?.image && /^https?:\/\//i.test(feedItunes.image)) {
+            source.image = feedItunes.image
         }
         return feed
     }
@@ -83,7 +94,7 @@ export class RSSSource {
             .limit(1)
             .exec()) as RSSItem[]
         if (items.length === 0) {
-            RSSItem.parseContent(i, item)
+            RSSItem.parseContent(i, item, source)
             if (source.rules) SourceRule.applyAll(source.rules, i)
             return i
         } else {
@@ -109,6 +120,15 @@ export class RSSSource {
 
     static async fetchItems(source: RSSSource) {
         const feed = await parseRSS(source.url)
+        // Backfill the feed-level image for sources that predate the image
+        // column (e.g. upgraded installs) so audio items can use the podcast
+        // logo as a cover fallback on subsequent fetches.
+        if (!source.image) {
+            const feedItunes = (feed as { itunes?: { image?: string } }).itunes
+            if (feedItunes?.image && /^https?:\/\//i.test(feedItunes.image)) {
+                source.image = feedItunes.image
+            }
+        }
         return await this.checkItems(source, feed.items)
     }
 }

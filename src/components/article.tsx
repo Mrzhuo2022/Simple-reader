@@ -1,7 +1,7 @@
 import * as React from "react"
 import intl from "react-intl-universal"
 import { renderToString } from "react-dom/server"
-import { RSSItem } from "../scripts/models/item"
+import { RSSItem, isAudioEnclosure } from "../scripts/models/item"
 import {
     Stack,
     CommandBarButton,
@@ -647,6 +647,32 @@ class Article extends React.Component<ArticleProps, ArticleState> {
 
     // --- Rendering ---
 
+    /**
+     * Inline audio player shown above the article body when the item carries a
+     * playable audio enclosure (typically a podcast). Uses the browser-native
+     * <audio> control so there's nothing to maintain; only rendered in article
+     * view (not when loading the original webpage) and never for video
+     * enclosures, which the reader has no UI for.
+     */
+    private audioBar = () => {
+        const enc = this.props.item.enclosure
+        if (this.state.loadWebpage || !isAudioEnclosure(enc)) return null
+        return (
+            <div className="audio-bar" role="region" aria-label={intl.get("article.audio")}>
+                <Icon iconName="Audio" style={{ fontSize: 16, color: "var(--primary)" }} />
+                <audio
+                    controls
+                    preload="none"
+                    src={enc!.url}
+                    style={{ flex: 1, height: 32, minWidth: 0 }}
+                    onError={() =>
+                        console.warn("[Article] audio enclosure failed to load:", enc!.url)
+                    }
+                />
+            </div>
+        )
+    }
+
     private articleView = () => {
         const articleContent = this.state.loadFull
             ? this.state.fullContent
@@ -788,6 +814,7 @@ class Article extends React.Component<ArticleProps, ArticleState> {
                     />
                 </Stack>
             </Stack>
+            {this.audioBar()}
             {(!this.state.loadFull || this.state.fullContent) && (
                 <webview
                     id="article"

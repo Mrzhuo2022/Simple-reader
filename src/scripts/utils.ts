@@ -24,12 +24,28 @@ const rssParser = new Parser({
             "image",
             ["content:encoded", "fullContent"],
             ["media:content", "mediaContent", { keepArray: true }],
+            // iTunes/podcast cover art. rss-parser already folds these into
+            // item.itunes.image, but declaring them as custom fields keeps the
+            // raw node available and makes the type explicit for downstream
+            // consumers that prefer the attribute form.
+            ["itunes:image", "itunesImage", { keepArray: true }],
         ],
     },
 })
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 type extractGeneric<Type> = Type extends Parser<infer _U, infer U> ? U : never
-export type MyParserItem = extractGeneric<typeof rssParser> & Parser.Item
+
+/**
+ * Item as produced by rss-parser. Podcast feeds carry their cover image under
+ * the iTunes namespace; both the rss-parser-builtin (`itunes.image`, a string
+ * URL) and the raw custom field (`itunesImage`, an array of attribute nodes)
+ * forms are exposed so callers can fall back between them.
+ */
+export type MyParserItem = extractGeneric<typeof rssParser> &
+    Parser.Item & {
+        itunes?: { image?: string }
+        itunesImage?: Array<{ $?: { href?: string } }>
+    }
 
 const CHARSET_RE = /charset=([^()<>@,;:"/[\]?.=\s]*)/i
 const XML_ENCODING_RE = /^<\?xml.+encoding="(.+?)".*?\?>/i

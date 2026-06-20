@@ -4,7 +4,7 @@ import lf from "lovefield"
 import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
 
-const sdbSchema = lf.schema.create("sourcesDB", 3)
+const sdbSchema = lf.schema.create("sourcesDB", 4)
 sdbSchema
     .createTable("sources")
     .addColumn("sid", lf.Type.INTEGER)
@@ -19,10 +19,11 @@ sdbSchema
     .addColumn("rules", lf.Type.OBJECT)
     .addColumn("textDir", lf.Type.NUMBER)
     .addColumn("hidden", lf.Type.BOOLEAN)
-    .addNullable(["iconurl", "serviceRef", "rules"])
+    .addColumn("image", lf.Type.STRING)
+    .addNullable(["iconurl", "serviceRef", "rules", "image"])
     .addIndex("idxURL", ["url"], true)
 
-const idbSchema = lf.schema.create("itemsDB", 4)
+const idbSchema = lf.schema.create("itemsDB", 5)
 idbSchema
     .createTable("items")
     .addColumn("_id", lf.Type.INTEGER)
@@ -44,6 +45,7 @@ idbSchema
     .addColumn("autoSummarize", lf.Type.BOOLEAN)
     .addColumn("autoFullText", lf.Type.BOOLEAN)
     .addColumn("serviceRef", lf.Type.STRING)
+    .addColumn("enclosure", lf.Type.OBJECT)
     .addNullable([
         "thumb",
         "creator",
@@ -51,6 +53,7 @@ idbSchema
         "autoTranslate",
         "autoSummarize",
         "autoFullText",
+        "enclosure",
     ])
     .addIndex("idxDate", ["date"], false, lf.Order.DESC)
     .addIndex("idxService", ["serviceRef"], false)
@@ -72,6 +75,11 @@ async function onUpgradeSourceDB(rawDb: lf.raw.BackStore) {
     if (version < 3) {
         await rawDb.addTableColumn("sources", "hidden", false)
     }
+    if (version < 4) {
+        // v4 adds the feed-level image column (podcast logo). Pre-existing
+        // sources get null and are populated on the next metadata fetch.
+        await rawDb.addTableColumn("sources", "image", null)
+    }
 }
 
 async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
@@ -87,6 +95,11 @@ async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
     // db via the raw BackStore API (it only supports addTableColumn), so there
     // is no data migration to perform here — lovefield reconciles index
     // metadata against the new schema on connect. Existing rows are preserved.
+    if (version < 5) {
+        // v5 adds the enclosure column for podcast/media support. Pre-existing
+        // items get a null enclosure; new items populate it at parse time.
+        await rawDb.addTableColumn("items", "enclosure", null)
+    }
 }
 
 export async function init() {
@@ -132,6 +145,9 @@ async function migrateNeDB() {
             if (!sourceData.fetchFrequency) sourceData.fetchFrequency = 0
             sourceData.textDir = 0
             sourceData.hidden = false
+            // Old nedb docs predate the image column; default to null so the
+            // row shape matches the v4 schema.
+            if (sourceData.image === undefined) sourceData.image = null
             return sources.createRow(sourceData)
         })
         const iRows = itemDocs.map(doc => {
