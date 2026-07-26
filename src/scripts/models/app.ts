@@ -37,7 +37,7 @@ function appendLog(logs: AppLog[], entry: AppLog): AppLog[] {
     next.push(entry)
     return next
 }
-export const enum ContextMenuType {
+export enum ContextMenuType {
     Hidden,
     Item,
     Text,
@@ -47,7 +47,7 @@ export const enum ContextMenuType {
     MarkRead,
 }
 
-export const enum AppLogType {
+export enum AppLogType {
     Info,
     Warning,
     Failure,

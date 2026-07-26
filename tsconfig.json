@@ -3,6 +3,7 @@
       "jsx": "react",
       "resolveJsonModule": true,
       "esModuleInterop": true,
+      "skipLibCheck": true,
       "target": "ES2019",
       "module": "CommonJS"
     }

@@ -15,14 +15,14 @@ import { saveSettings } from "./app"
 import { SourceRule } from "./rule"
 import { fixBrokenGroups, addSourceToGroup } from "./group"
 
-export const enum SourceOpenTarget {
+export enum SourceOpenTarget {
     Local,
     Webpage,
     External,
     FullContent,
 }
 
-export const enum SourceTextDirection {
+export enum SourceTextDirection {
     LTR,
     RTL,
     Vertical,

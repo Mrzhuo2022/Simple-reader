@@ -18,7 +18,7 @@ export class SourceGroup {
     }
 }
 
-export const enum ViewType {
+export enum ViewType {
     Cards,
     List,
     Magazine,
@@ -26,26 +26,26 @@ export const enum ViewType {
     Customized,
 }
 
-export const enum ViewConfigs {
+export enum ViewConfigs {
     ShowCover = 1 << 0,
     ShowSnippet = 1 << 1,
     FadeRead = 1 << 2,
 }
 
-export const enum ThemeSettings {
+export enum ThemeSettings {
     Default = "system",
     Light = "light",
     Dark = "dark",
 }
 
-export const enum SearchEngines {
+export enum SearchEngines {
     Google,
     Bing,
     Baidu,
     DuckDuckGo,
 }
 
-export const enum ImageCallbackTypes {
+export enum ImageCallbackTypes {
     OpenExternal,
     OpenExternalBg,
     SaveAs,
@@ -53,7 +53,7 @@ export const enum ImageCallbackTypes {
     CopyLink,
 }
 
-export const enum SyncService {
+export enum SyncService {
     None,
     Fever,
     Feedbin,
@@ -67,7 +67,7 @@ export interface ServiceConfigs {
     importGroups?: boolean
 }
 
-export const enum WindowStateListenerType {
+export enum WindowStateListenerType {
     Maximized,
     Focused,
     Fullscreen,

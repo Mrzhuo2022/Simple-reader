@@ -1,7 +1,7 @@
 import { FeedFilter, FilterType } from "./feed"
 import { RSSItem } from "./item"
 
-export const enum ItemAction {
+export enum ItemAction {
     Read = "r",
     Star = "s",
     Hide = "h",

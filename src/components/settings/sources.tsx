@@ -69,7 +69,7 @@ interface SourcesTabState {
     selectedSources: RSSSource[]
 }
 
-const enum EditDropdownKeys {
+enum EditDropdownKeys {
     Name = "n",
     Icon = "i",
     Url = "u",
