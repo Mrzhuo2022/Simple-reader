@@ -1,6 +1,7 @@
 import { ipcRenderer } from "electron"
 import { ImageCallbackTypes, TouchBarTexts, WindowStateListenerType } from "../schema-types"
 import { IObjectWithKey } from "@fluentui/react"
+import { cache } from "./startup-cache"
 
 export type UpdateStatus = {
     hasUpdate: boolean
@@ -13,7 +14,7 @@ const utilsBridge = {
     platform: process.platform,
 
     getVersion: (): string => {
-        return ipcRenderer.sendSync("get-version")
+        return cache.version
     },
 
     checkUpdate: async (): Promise<UpdateStatus> => {
@@ -116,13 +117,13 @@ const utilsBridge = {
         ipcRenderer.invoke("maximize-window")
     },
     isMaximized: () => {
-        return ipcRenderer.sendSync("is-maximized") as boolean
+        return cache.maximized
     },
     isFullscreen: () => {
-        return ipcRenderer.sendSync("is-fullscreen") as boolean
+        return cache.fullscreen
     },
     isFocused: () => {
-        return ipcRenderer.sendSync("is-focused") as boolean
+        return cache.focused
     },
     focus: () => {
         ipcRenderer.invoke("request-focus")
@@ -133,26 +134,32 @@ const utilsBridge = {
     addWindowStateListener: (callback: (type: WindowStateListenerType, state: boolean) => void) => {
         ipcRenderer.removeAllListeners("maximized")
         ipcRenderer.on("maximized", () => {
+            cache.maximized = true
             callback(WindowStateListenerType.Maximized, true)
         })
         ipcRenderer.removeAllListeners("unmaximized")
         ipcRenderer.on("unmaximized", () => {
+            cache.maximized = false
             callback(WindowStateListenerType.Maximized, false)
         })
         ipcRenderer.removeAllListeners("enter-fullscreen")
         ipcRenderer.on("enter-fullscreen", () => {
+            cache.fullscreen = true
             callback(WindowStateListenerType.Fullscreen, true)
         })
         ipcRenderer.removeAllListeners("leave-fullscreen")
         ipcRenderer.on("leave-fullscreen", () => {
+            cache.fullscreen = false
             callback(WindowStateListenerType.Fullscreen, false)
         })
         ipcRenderer.removeAllListeners("window-focus")
         ipcRenderer.on("window-focus", () => {
+            cache.focused = true
             callback(WindowStateListenerType.Focused, true)
         })
         ipcRenderer.removeAllListeners("window-blur")
         ipcRenderer.on("window-blur", () => {
+            cache.focused = false
             callback(WindowStateListenerType.Focused, false)
         })
     },

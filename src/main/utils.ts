@@ -1,5 +1,6 @@
 import { ipcMain, shell, dialog, app, session, clipboard } from "electron"
 import { WindowManager } from "./window"
+import { getAllStartupSettings } from "./settings"
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import fs = require("fs")
 import { ImageCallbackTypes, TouchBarTexts } from "../schema-types"
@@ -56,9 +57,7 @@ export function setUtilsListeners(manager: WindowManager) {
         })
     })
 
-    ipcMain.on("get-version", event => {
-        event.returnValue = getAppVersion()
-    })
+    ipcMain.handle("get-version", () => getAppVersion())
 
     ipcMain.handle("open-external", (_, url: string, background: boolean) => {
         openExternal(url, background)
@@ -237,16 +236,28 @@ export function setUtilsListeners(manager: WindowManager) {
         manager.zoom()
     })
 
-    ipcMain.on("is-maximized", event => {
-        event.returnValue = Boolean(manager.mainWindow) && manager.mainWindow.isMaximized()
+    ipcMain.handle("is-maximized", () => {
+        return Boolean(manager.mainWindow) && manager.mainWindow.isMaximized()
     })
 
-    ipcMain.on("is-focused", event => {
-        event.returnValue = manager.hasWindow() && manager.mainWindow.isFocused()
+    ipcMain.handle("is-focused", () => {
+        return manager.hasWindow() && manager.mainWindow.isFocused()
     })
 
-    ipcMain.on("is-fullscreen", event => {
-        event.returnValue = manager.hasWindow() && manager.mainWindow.isFullScreen()
+    ipcMain.handle("is-fullscreen", () => {
+        return manager.hasWindow() && manager.mainWindow.isFullScreen()
+    })
+
+    // Aggregate startup snapshot: lets the renderer fill its sync cache with a
+    // single round-trip instead of dozens of blocking sendSync calls.
+    ipcMain.handle("get-all-startup-data", () => {
+        return {
+            ...getAllStartupSettings(),
+            version: getAppVersion(),
+            maximized: Boolean(manager.mainWindow) && manager.mainWindow.isMaximized(),
+            fullscreen: manager.hasWindow() && manager.mainWindow.isFullScreen(),
+            focused: manager.hasWindow() && manager.mainWindow.isFocused(),
+        }
     })
 
     ipcMain.handle("request-focus", () => {

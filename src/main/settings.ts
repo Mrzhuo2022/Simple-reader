@@ -21,22 +21,25 @@ const GROUPS_STORE_KEY = "sourceGroups"
 ipcMain.handle("set-groups", (_, groups: SourceGroup[]) => {
     store.set(GROUPS_STORE_KEY, groups)
 })
-ipcMain.on("get-groups", event => {
-    event.returnValue = store.get(GROUPS_STORE_KEY, [])
-})
+function getGroups() {
+    return store.get(GROUPS_STORE_KEY, [])
+}
+ipcMain.handle("get-groups", () => getGroups())
 
 const MENU_STORE_KEY = "menuOn"
-ipcMain.on("get-menu", event => {
-    event.returnValue = store.get(MENU_STORE_KEY, false)
-})
+function getMenu() {
+    return store.get(MENU_STORE_KEY, false)
+}
+ipcMain.handle("get-menu", () => getMenu())
 ipcMain.handle("set-menu", (_, state: boolean) => {
     store.set(MENU_STORE_KEY, state)
 })
 
 const CLOSE_TO_TRAY_KEY = "closeToTray"
-ipcMain.on("get-close-to-tray", event => {
-    event.returnValue = store.get(CLOSE_TO_TRAY_KEY, true)
-})
+function getCloseToTray() {
+    return store.get(CLOSE_TO_TRAY_KEY, true)
+}
+ipcMain.handle("get-close-to-tray", () => getCloseToTray())
 ipcMain.handle("set-close-to-tray", (_, state: boolean) => {
     store.set(CLOSE_TO_TRAY_KEY, state)
 })
@@ -65,38 +68,34 @@ function setProxy(address = null) {
         session.fromPartition("sandbox").setProxy(rules)
     }
 }
-ipcMain.on("get-proxy-status", event => {
-    event.returnValue = getProxyStatus()
-})
+ipcMain.handle("get-proxy-status", () => getProxyStatus())
 ipcMain.on("toggle-proxy-status", () => {
     toggleProxyStatus()
 })
-ipcMain.on("get-proxy", event => {
-    event.returnValue = getProxy()
-})
+ipcMain.handle("get-proxy", () => getProxy())
 ipcMain.handle("set-proxy", (_, address?: string | null) => {
     setProxy(address)
 })
 
 const VIEW_STORE_KEY = "view"
-ipcMain.on("get-view", event => {
-    event.returnValue = store.get(VIEW_STORE_KEY, ViewType.Cards)
-})
+function getView() {
+    return store.get(VIEW_STORE_KEY, ViewType.Cards)
+}
+ipcMain.handle("get-view", () => getView())
 ipcMain.handle("set-view", (_, viewType: ViewType) => {
     store.set(VIEW_STORE_KEY, viewType)
 })
 
 const THEME_STORE_KEY = "theme"
-ipcMain.on("get-theme", event => {
-    event.returnValue = store.get(THEME_STORE_KEY, ThemeSettings.Default)
-})
+function getTheme() {
+    return store.get(THEME_STORE_KEY, ThemeSettings.Default)
+}
+ipcMain.handle("get-theme", () => getTheme())
 ipcMain.handle("set-theme", (_, theme: ThemeSettings) => {
     store.set(THEME_STORE_KEY, theme)
     nativeTheme.themeSource = theme
 })
-ipcMain.on("get-theme-dark-color", event => {
-    event.returnValue = nativeTheme.shouldUseDarkColors
-})
+ipcMain.handle("get-theme-dark-color", () => nativeTheme.shouldUseDarkColors)
 export function setThemeListener(manager: WindowManager) {
     nativeTheme.removeAllListeners()
     nativeTheme.on("updated", () => {
@@ -116,82 +115,86 @@ ipcMain.handle("set-locale", (_, option: string) => {
 function getLocaleSettings() {
     return store.get(LOCALE_STORE_KEY, "default")
 }
-ipcMain.on("get-locale-settings", event => {
-    event.returnValue = getLocaleSettings()
-})
-ipcMain.on("get-locale", event => {
+ipcMain.handle("get-locale-settings", () => getLocaleSettings())
+ipcMain.handle("get-locale", () => {
     const setting = getLocaleSettings()
-    const locale = setting === "default" ? app.getLocale() : setting
-    event.returnValue = locale
+    return setting === "default" ? app.getLocale() : setting
 })
 
 const FONT_SIZE_STORE_KEY = "fontSize"
-ipcMain.on("get-font-size", event => {
-    event.returnValue = store.get(FONT_SIZE_STORE_KEY, 16)
-})
+function getFontSize() {
+    return store.get(FONT_SIZE_STORE_KEY, 16)
+}
+ipcMain.handle("get-font-size", () => getFontSize())
 ipcMain.handle("set-font-size", (_, size: number) => {
     store.set(FONT_SIZE_STORE_KEY, size)
 })
 
 const FONT_STORE_KEY = "fontFamily"
-ipcMain.on("get-font", event => {
-    event.returnValue = store.get(FONT_STORE_KEY, "")
-})
+function getFont() {
+    return store.get(FONT_STORE_KEY, "")
+}
+ipcMain.handle("get-font", () => getFont())
 ipcMain.handle("set-font", (_, font: string) => {
     store.set(FONT_STORE_KEY, font)
 })
 
-ipcMain.on("get-all-settings", event => {
+ipcMain.handle("get-all-settings", () => {
     const output: Record<string, unknown> = {}
     for (const [key, value] of store) {
         output[key] = value
     }
-    event.returnValue = output
+    return output
 })
 
 const FETCH_INTEVAL_STORE_KEY = "fetchInterval"
-ipcMain.on("get-fetch-interval", event => {
-    event.returnValue = store.get(FETCH_INTEVAL_STORE_KEY, 0)
-})
+function getFetchInterval() {
+    return store.get(FETCH_INTEVAL_STORE_KEY, 0)
+}
+ipcMain.handle("get-fetch-interval", () => getFetchInterval())
 ipcMain.handle("set-fetch-interval", (_, interval: number) => {
     store.set(FETCH_INTEVAL_STORE_KEY, interval)
 })
 
 const SEARCH_ENGINE_STORE_KEY = "searchEngine"
-ipcMain.on("get-search-engine", event => {
-    event.returnValue = store.get(SEARCH_ENGINE_STORE_KEY, SearchEngines.Google)
-})
+function getSearchEngine() {
+    return store.get(SEARCH_ENGINE_STORE_KEY, SearchEngines.Google)
+}
+ipcMain.handle("get-search-engine", () => getSearchEngine())
 ipcMain.handle("set-search-engine", (_, engine: SearchEngines) => {
     store.set(SEARCH_ENGINE_STORE_KEY, engine)
 })
 
 const SERVICE_CONFIGS_STORE_KEY = "serviceConfigs"
-ipcMain.on("get-service-configs", event => {
-    event.returnValue = store.get(SERVICE_CONFIGS_STORE_KEY, {
+function getServiceConfigs() {
+    return store.get(SERVICE_CONFIGS_STORE_KEY, {
         type: SyncService.None,
     })
-})
+}
+ipcMain.handle("get-service-configs", () => getServiceConfigs())
 ipcMain.handle("set-service-configs", (_, configs: ServiceConfigs) => {
     store.set(SERVICE_CONFIGS_STORE_KEY, configs)
 })
 
 const FILTER_TYPE_STORE_KEY = "filterType"
-ipcMain.on("get-filter-type", event => {
-    event.returnValue = store.get(FILTER_TYPE_STORE_KEY, null)
-})
+function getFilterType() {
+    return store.get(FILTER_TYPE_STORE_KEY, null)
+}
+ipcMain.handle("get-filter-type", () => getFilterType())
 ipcMain.handle("set-filter-type", (_, filterType: number) => {
     store.set(FILTER_TYPE_STORE_KEY, filterType)
 })
 
 const LIST_CONFIGS_STORE_KEY = "listViewConfigs"
-ipcMain.on("get-view-configs", (event, view: ViewType) => {
+function getListViewConfigs() {
+    return store.get(LIST_CONFIGS_STORE_KEY, ViewConfigs.ShowCover)
+}
+ipcMain.handle("get-view-configs", (_, view: ViewType) => {
     switch (view) {
         case ViewType.List:
-            event.returnValue = store.get(LIST_CONFIGS_STORE_KEY, ViewConfigs.ShowCover)
-            break
+            return getListViewConfigs()
         default:
-            event.returnValue = undefined
-            break
+            return undefined
     }
 })
 ipcMain.handle("set-view-configs", (_, view: ViewType, configs: ViewConfigs) => {
@@ -203,9 +206,10 @@ ipcMain.handle("set-view-configs", (_, view: ViewType, configs: ViewConfigs) => 
 })
 
 const NEDB_STATUS_STORE_KEY = "useNeDB"
-ipcMain.on("get-nedb-status", event => {
-    event.returnValue = store.get(NEDB_STATUS_STORE_KEY, true)
-})
+function getNeDBStatus() {
+    return store.get(NEDB_STATUS_STORE_KEY, true)
+}
+ipcMain.handle("get-nedb-status", () => getNeDBStatus())
 ipcMain.handle("set-nedb-status", (_, flag: boolean) => {
     store.set(NEDB_STATUS_STORE_KEY, flag)
 })
@@ -234,10 +238,11 @@ const DEFAULT_SHORTCUTS: Shortcuts = {
     articleToggleWeb: "L",
     articleToggleFull: "W",
 }
-ipcMain.on("get-shortcuts", event => {
+function getShortcuts(): Shortcuts {
     const saved = store.get(SHORTCUTS_STORE_KEY, DEFAULT_SHORTCUTS) as Partial<Shortcuts>
-    event.returnValue = { ...DEFAULT_SHORTCUTS, ...(saved || {}) }
-})
+    return { ...DEFAULT_SHORTCUTS, ...(saved || {}) }
+}
+ipcMain.handle("get-shortcuts", () => getShortcuts())
 ipcMain.handle("set-shortcuts", (_, shortcuts: Shortcuts) => {
     store.set(SHORTCUTS_STORE_KEY, shortcuts)
 })
@@ -257,11 +262,12 @@ const DEFAULT_AI_CONFIGS: AIConfigs = {
     maxTextLengthPerRequest: 1500,
     maxParagraphsPerRequest: 1,
 }
-ipcMain.on("get-ai-configs", event => {
-    const saved = store.get(AI_CONFIGS_STORE_KEY, DEFAULT_AI_CONFIGS) as Partial<AIConfigs>
+function getAIConfigs(): AIConfigs {
     // 合并默认值，兼容历史存储缺失字段
-    event.returnValue = { ...DEFAULT_AI_CONFIGS, ...(saved || {}) }
-})
+    const saved = store.get(AI_CONFIGS_STORE_KEY, DEFAULT_AI_CONFIGS) as Partial<AIConfigs>
+    return { ...DEFAULT_AI_CONFIGS, ...(saved || {}) }
+}
+ipcMain.handle("get-ai-configs", () => getAIConfigs())
 ipcMain.handle("set-ai-configs", (_, configs: AIConfigs) => {
     store.set(AI_CONFIGS_STORE_KEY, configs)
 })
@@ -311,3 +317,31 @@ ipcMain.handle("ai-cache-size", () => {
 app.on("before-quit", () => {
     aiCache.closeDB()
 })
+
+// One-shot snapshot consumed by the renderer at startup so that all former
+// sendSync getters can be served from a local cache (see bridges/startup-cache).
+export function getAllStartupSettings() {
+    const localeSettings = getLocaleSettings()
+    return {
+        groups: getGroups(),
+        menuOn: getMenu(),
+        closeToTray: getCloseToTray(),
+        proxyStatus: getProxyStatus(),
+        proxy: getProxy(),
+        view: getView(),
+        theme: getTheme(),
+        darkColors: nativeTheme.shouldUseDarkColors,
+        localeSettings: localeSettings,
+        defaultLocale: app.getLocale(),
+        fontSize: getFontSize(),
+        font: getFont(),
+        fetchInterval: getFetchInterval(),
+        searchEngine: getSearchEngine(),
+        serviceConfigs: getServiceConfigs(),
+        filterType: getFilterType(),
+        listViewConfigs: getListViewConfigs(),
+        nedbStatus: getNeDBStatus(),
+        shortcuts: getShortcuts(),
+        aiConfigs: getAIConfigs(),
+    }
+}

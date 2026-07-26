@@ -3,6 +3,7 @@
 // Runs before every test file (see jest.config.js setupFiles).
 
 const settingsStub = {
+    prefetch: jest.fn(async () => {}),
     saveGroups: jest.fn(),
     loadGroups: jest.fn(() => []),
     getDefaultMenu: jest.fn(() => false),
@@ -48,7 +49,7 @@ const settingsStub = {
         availableModels: [],
     })),
     setAIConfigs: jest.fn(),
-    getAll: jest.fn(() => ({})),
+    getAll: jest.fn(async () => ({})),
     setAll: jest.fn(),
 }
 

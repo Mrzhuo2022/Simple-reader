@@ -90,7 +90,7 @@ export async function exportAll() {
     const filters = [{ name: intl.get("app.frData"), extensions: ["frdata"] }]
     const write = await window.utils.showSaveDialog(filters, "*/Simple_Reader_Backup.frdata")
     if (write) {
-        const output = window.settings.getAll()
+        const output = await window.settings.getAll()
         output["lovefield"] = {
             sources: await db.sourcesDB.select().from(db.sources).exec(),
             items: await db.itemsDB.select().from(db.items).exec(),

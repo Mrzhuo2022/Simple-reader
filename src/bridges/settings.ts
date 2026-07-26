@@ -10,141 +10,172 @@ import {
 } from "../schema-types"
 import { ipcRenderer } from "electron"
 import { AICacheEntry } from "../scripts/models/services/aiCache"
+import { cache } from "./startup-cache"
 
 const settingsBridge = {
+    // Fills the local cache with one round-trip. Must resolve before any of
+    // the synchronous getters below are used (index.tsx awaits it on boot).
+    prefetch: async (): Promise<void> => {
+        Object.assign(cache, await ipcRenderer.invoke("get-all-startup-data"))
+    },
+
     saveGroups: (groups: SourceGroup[]) => {
+        cache.groups = groups
         ipcRenderer.invoke("set-groups", groups)
     },
     loadGroups: (): SourceGroup[] => {
-        return ipcRenderer.sendSync("get-groups")
+        return cache.groups
     },
 
     getDefaultMenu: (): boolean => {
-        return ipcRenderer.sendSync("get-menu")
+        return cache.menuOn
     },
     setDefaultMenu: (state: boolean) => {
+        cache.menuOn = state
         ipcRenderer.invoke("set-menu", state)
     },
 
     getCloseToTray: (): boolean => {
-        return ipcRenderer.sendSync("get-close-to-tray")
+        return cache.closeToTray
     },
     setCloseToTray: (state: boolean) => {
+        cache.closeToTray = state
         ipcRenderer.invoke("set-close-to-tray", state)
     },
 
     getProxyStatus: (): boolean => {
-        return ipcRenderer.sendSync("get-proxy-status")
+        return cache.proxyStatus
     },
     toggleProxyStatus: () => {
+        cache.proxyStatus = !cache.proxyStatus
         ipcRenderer.send("toggle-proxy-status")
     },
     getProxy: (): string => {
-        return ipcRenderer.sendSync("get-proxy")
+        return cache.proxy
     },
     setProxy: (address?: string | null) => {
+        if (address) cache.proxy = address
         ipcRenderer.invoke("set-proxy", address)
     },
 
     getDefaultView: (): ViewType => {
-        return ipcRenderer.sendSync("get-view")
+        return cache.view
     },
     setDefaultView: (viewType: ViewType) => {
+        cache.view = viewType
         ipcRenderer.invoke("set-view", viewType)
     },
 
     getThemeSettings: (): ThemeSettings => {
-        return ipcRenderer.sendSync("get-theme")
+        return cache.theme
     },
     setThemeSettings: (theme: ThemeSettings) => {
+        cache.theme = theme
         ipcRenderer.invoke("set-theme", theme)
     },
     shouldUseDarkColors: (): boolean => {
-        return ipcRenderer.sendSync("get-theme-dark-color")
+        return cache.darkColors
     },
     addThemeUpdateListener: (callback: (shouldDark: boolean) => void) => {
         ipcRenderer.on("theme-updated", (_, shouldDark) => {
+            cache.darkColors = shouldDark
             callback(shouldDark)
         })
     },
 
     setLocaleSettings: (option: string) => {
+        cache.localeSettings = option
         ipcRenderer.invoke("set-locale", option)
     },
     getLocaleSettings: (): string => {
-        return ipcRenderer.sendSync("get-locale-settings")
+        return cache.localeSettings
     },
     getCurrentLocale: (): string => {
-        return ipcRenderer.sendSync("get-locale")
+        return cache.localeSettings === "default" ? cache.defaultLocale : cache.localeSettings
     },
 
     getFontSize: (): number => {
-        return ipcRenderer.sendSync("get-font-size")
+        return cache.fontSize
     },
     setFontSize: (size: number) => {
+        cache.fontSize = size
         ipcRenderer.invoke("set-font-size", size)
     },
 
     getFont: (): string => {
-        return ipcRenderer.sendSync("get-font")
+        return cache.font
     },
     setFont: (font: string) => {
+        cache.font = font
         ipcRenderer.invoke("set-font", font)
     },
 
     getFetchInterval: (): number => {
-        return ipcRenderer.sendSync("get-fetch-interval")
+        return cache.fetchInterval
     },
     setFetchInterval: (interval: number) => {
+        cache.fetchInterval = interval
         ipcRenderer.invoke("set-fetch-interval", interval)
     },
 
     getSearchEngine: (): SearchEngines => {
-        return ipcRenderer.sendSync("get-search-engine")
+        return cache.searchEngine
     },
     setSearchEngine: (engine: SearchEngines) => {
+        cache.searchEngine = engine
         ipcRenderer.invoke("set-search-engine", engine)
     },
 
     getServiceConfigs: (): ServiceConfigs => {
-        return ipcRenderer.sendSync("get-service-configs")
+        return cache.serviceConfigs
     },
     setServiceConfigs: (configs: ServiceConfigs) => {
+        cache.serviceConfigs = configs
         ipcRenderer.invoke("set-service-configs", configs)
     },
 
     getFilterType: (): number => {
-        return ipcRenderer.sendSync("get-filter-type")
+        return cache.filterType
     },
     setFilterType: (filterType: number) => {
+        cache.filterType = filterType
         ipcRenderer.invoke("set-filter-type", filterType)
     },
 
     getViewConfigs: (view: ViewType): ViewConfigs => {
-        return ipcRenderer.sendSync("get-view-configs", view)
+        switch (view) {
+            case ViewType.List:
+                return cache.listViewConfigs
+            default:
+                return undefined
+        }
     },
     setViewConfigs: (view: ViewType, configs: ViewConfigs) => {
+        if (view === ViewType.List) cache.listViewConfigs = configs
         ipcRenderer.invoke("set-view-configs", view, configs)
     },
 
     getNeDBStatus: (): boolean => {
-        return ipcRenderer.sendSync("get-nedb-status")
+        return cache.nedbStatus
     },
     setNeDBStatus: (flag: boolean) => {
+        cache.nedbStatus = flag
         ipcRenderer.invoke("set-nedb-status", flag)
     },
 
     getShortcuts: (): Shortcuts => {
-        return ipcRenderer.sendSync("get-shortcuts")
+        return cache.shortcuts
     },
     setShortcuts: (shortcuts: Shortcuts) => {
+        cache.shortcuts = shortcuts
         ipcRenderer.invoke("set-shortcuts", shortcuts)
     },
 
     getAIConfigs: (): AIConfigs => {
-        return ipcRenderer.sendSync("get-ai-configs")
+        return cache.aiConfigs
     },
     setAIConfigs: (configs: AIConfigs) => {
+        cache.aiConfigs = configs
         ipcRenderer.invoke("set-ai-configs", configs)
     },
 
@@ -168,8 +199,8 @@ const settingsBridge = {
         return ipcRenderer.invoke("ai-cache-size")
     },
 
-    getAll: (): Record<string, unknown> => {
-        return ipcRenderer.sendSync("get-all-settings") as Record<string, unknown>
+    getAll: async (): Promise<Record<string, unknown>> => {
+        return (await ipcRenderer.invoke("get-all-settings")) as Record<string, unknown>
     },
 
     setAll: (configs: Record<string, unknown>): void => {
