@@ -1,5 +1,4 @@
 import intl from "react-intl-universal"
-import Datastore from "nedb"
 import lf from "lovefield"
 import { RSSSource } from "./models/source"
 import { RSSItem } from "./models/item"
@@ -23,12 +22,13 @@ sdbSchema
     .addNullable(["iconurl", "serviceRef", "rules", "image"])
     .addIndex("idxURL", ["url"], true)
 
-const idbSchema = lf.schema.create("itemsDB", 5)
+const idbSchema = lf.schema.create("itemsDB", 6)
 idbSchema
     .createTable("items")
     .addColumn("_id", lf.Type.INTEGER)
     .addPrimaryKey(["_id"], true)
     .addColumn("source", lf.Type.INTEGER)
+    .addColumn("guid", lf.Type.STRING)
     .addColumn("title", lf.Type.STRING)
     .addColumn("link", lf.Type.STRING)
     .addColumn("date", lf.Type.DATE_TIME)
@@ -47,6 +47,7 @@ idbSchema
     .addColumn("serviceRef", lf.Type.STRING)
     .addColumn("enclosure", lf.Type.OBJECT)
     .addNullable([
+        "guid",
         "thumb",
         "creator",
         "serviceRef",
@@ -100,6 +101,12 @@ async function onUpgradeItemDB(rawDb: lf.raw.BackStore) {
         // items get a null enclosure; new items populate it at parse time.
         await rawDb.addTableColumn("items", "enclosure", null)
     }
+    if (version < 6) {
+        // v6 adds the guid column for guid-based deduplication. Migrated
+        // rows stay null and keep matching through the legacy title+date
+        // identity (see checkItems in models/source).
+        await rawDb.addTableColumn("items", "guid", null)
+    }
 }
 
 export async function init() {
@@ -114,6 +121,11 @@ export async function init() {
 
 async function migrateNeDB() {
     try {
+        // The maintained nedb fork (fixes GHSA-339j-hqgx-qrrx) is imported
+        // lazily: the legacy migration runs at most once per install, and
+        // the fork plus its localforage dependency would otherwise sit in
+        // the startup bundle (~200 KB) as dead weight forever after.
+        const { default: Datastore } = await import("@seald-io/nedb")
         const sdb = new Datastore<RSSSource>({
             filename: "sources",
             autoload: true,

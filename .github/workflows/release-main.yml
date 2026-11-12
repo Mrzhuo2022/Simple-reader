@@ -46,7 +46,9 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: "20"
+                  # Node 20 reached end-of-life in April 2026; 24 is the
+                  # current active LTS. Keep in sync with engines.node.
+                  node-version: "24"
                   cache: "pnpm"
 
             - name: Read app version

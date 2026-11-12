@@ -2,8 +2,8 @@ const HtmlWebpackPlugin = require("html-webpack-plugin")
 const NodePolyfillPlugin = require("node-polyfill-webpack-plugin")
 
 // esbuild-loader transpiles each file in isolation (no type checking); run
-// `npm run check` (tsc --noEmit) for types. Electron 39 ships modern V8/Chromium,
-// so es2022 output is safe for all three targets.
+// `pnpm run check` (tsc --noEmit) for types. Electron 42 ships modern
+// V8/Chromium, so es2022 output is safe for all three targets.
 const esbuildRule = test => ({
     test: test,
     include: /src/,
@@ -25,7 +25,11 @@ module.exports = env => {
     const base = {
         mode: dev ? "development" : "production",
         watch: dev,
-        devtool: dev ? "eval-cheap-module-source-map" : false,
+        // Dev uses a non-eval devtool on purpose: the renderer CSP
+        // (src/index.html) has default-src 'none' without unsafe-eval, so
+        // eval-based devtools (eval-cheap-module-source-map) would get every
+        // module blocked and the app renders a blank screen in dev mode.
+        devtool: dev ? "cheap-module-source-map" : false,
     }
     return [
         {
