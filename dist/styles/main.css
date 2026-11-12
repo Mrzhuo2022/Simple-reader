@@ -22,17 +22,14 @@
     width: 100%;
     height: 100%;
 }
-.article-container {
-    backdrop-filter: var(--blur);
-    animation-name: fade;
-    background-color: #0008;
-}
+/* The article overlay skips backdrop-filter and the dimmed fade: blurring
+   the page behind it forced expensive full-surface repaints while the
+   opaque webview covers it anyway. */
 .menu-container,
-.article-container,
 .article-wrapper {
     animation-duration: 0.5s;
     animation-timing-function: var(--transition-timing);
-    animation-fill-mode: both;
+    animation-fill-mode: backwards;
 }
 .menu-container {
     pointer-events: none;

@@ -1,4 +1,4 @@
-import { connect } from "react-redux"
+import { connect, shallowEqual } from "react-redux"
 import { createSelector } from "reselect"
 import { RootState } from "../scripts/reducer"
 import { markRead, RSSItem, itemShortcuts } from "../scripts/models/item"
@@ -23,7 +23,13 @@ const getCurrentItem = (state: RootState) => state.page.itemId
 
 const makeMapStateToProps = () => {
     return createSelector(
-        [getSources, getItems, getFeed, getView, getFilter, getViewConfigs, getCurrentItem],
+        getSources,
+        getItems,
+        getFeed,
+        getView,
+        getFilter,
+        getViewConfigs,
+        getCurrentItem,
         (sources, items, feed, viewType, filter, viewConfigs, currentItem) => ({
             feed: feed,
             items: feed.iids.map(iid => items[iid]),
@@ -32,7 +38,12 @@ const makeMapStateToProps = () => {
             viewType: viewType,
             viewConfigs: viewConfigs,
             currentItem: currentItem,
-        })
+        }),
+        // The mapped object holds fresh identities after every items-state
+        // update (the array is rebuilt, syncs replace the sources map).
+        // Shallow-checking the result keeps unchanged item identities from
+        // re-rendering the whole Feed list machinery.
+        { memoizeOptions: { resultEqualityCheck: shallowEqual } }
     )
 }
 const mapDispatchToProps = dispatch => {
