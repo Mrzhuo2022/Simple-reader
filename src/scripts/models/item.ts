@@ -2,7 +2,14 @@ import * as db from "../db"
 import lf from "lovefield"
 import intl from "react-intl-universal"
 import type { MyParserItem } from "../utils"
-import { domParser, htmlDecode, ActionStatus, AppThunk, platformCtrl } from "../utils"
+import {
+    domParser,
+    htmlDecode,
+    ActionStatus,
+    AppThunk,
+    platformCtrl,
+    matchShortcut,
+} from "../utils"
 import { RSSSource, updateSource, updateUnreadCounts } from "./source"
 import { FeedActionTypes, INIT_FEED, LOAD_MORE, dismissItems } from "./feed"
 import { pushNotification, setupAutoFetch, SettingsActionTypes, FREE_MEMORY } from "./app"
@@ -42,22 +49,36 @@ export class RSSItem {
     autoTranslate?: boolean
     autoSummarize?: boolean
     autoFullText?: boolean
+    // Feed-provided unique id (RSS <guid> / Atom <id>), local sources only.
+    // Service-synced items identify through serviceRef instead.
+    guid?: string
     serviceRef?: string
     // Media enclosure (e.g. podcast audio). Only populated for media the
     // reader can do something with; everything else is dropped on parse.
     enclosure?: ItemEnclosure
 
     constructor(item: MyParserItem, source: RSSSource) {
-        for (const field of ["title", "link", "creator"]) {
+        for (const field of ["title", "link", "creator", "author"]) {
             const content = item[field]
             if (content && typeof content !== "string") delete item[field]
         }
         this.source = source.sid
+        // Keep the feed's own identity when present so deduplication can
+        // survive republished items whose title/date change (see checkItems).
+        if (!source.serviceRef) {
+            this.guid = [item.guid, item.id].find(
+                value => typeof value === "string" && value.trim().length > 0
+            )
+        }
         this.title = item.title || intl.get("nav.untitled")
         this.link = item.link || ""
         this.fetchedDate = new Date()
-        this.date = new Date(item.isoDate ?? item.pubDate ?? this.fetchedDate)
-        this.creator = item.creator
+        // Malformed dates ("", garbage strings) parse to Invalid Date; fall
+        // back to the fetch time so sorting and DB inserts stay well-defined.
+        const parsed = new Date(item.isoDate ?? item.pubDate)
+        this.date = isNaN(parsed.getTime()) ? this.fetchedDate : parsed
+        // rss-parser emits Atom entries as `author` instead of `creator`.
+        this.creator = item.creator || item.author
         this.hasRead = false
         this.starred = false
         this.hidden = false
@@ -256,8 +277,14 @@ export function fetchItems(background = false, sids: number[] = null): AppThunk<
                     : sids.map(sid => sourcesState[sid]).filter(s => !s.serviceRef)
             for (const source of sources) {
                 const promise = RSSSource.fetchItems(source)
-                promise.then(() => dispatch(updateSource({ ...source, lastFetched: new Date() })))
-                promise.finally(() => dispatch(fetchItemsIntermediate()))
+                // The original promises are consumed by Promise.allSettled
+                // below; every derived chain needs its own catch, or each
+                // failing source emits unhandled rejections every cycle.
+                promise.then(
+                    () => dispatch(updateSource({ ...source, lastFetched: new Date() })),
+                    () => {}
+                )
+                promise.finally(() => dispatch(fetchItemsIntermediate())).catch(() => {})
                 promises.push(promise)
             }
             dispatch(fetchItemsRequest(promises.length))
@@ -430,26 +457,7 @@ export function itemShortcuts(item: RSSItem, e: KeyboardEvent): AppThunk {
                 ? window.settings.getShortcuts()
                 : null) || null
 
-        const isMatch = (shortcut: string | undefined, ev: KeyboardEvent) => {
-            if (!shortcut) return false
-            const parts = shortcut.toLowerCase().split("+")
-            const key = parts[parts.length - 1]
-            const needCtrl = parts.includes("ctrl") || parts.includes("control")
-            const needMeta =
-                parts.includes("meta") || parts.includes("command") || parts.includes("cmd")
-            const needAlt = parts.includes("alt")
-            const needShift = parts.includes("shift")
-
-            const inputKey = ev.key.toLowerCase()
-
-            if (inputKey !== key) return false
-            if (!!ev.ctrlKey !== needCtrl) return false
-            if (!!ev.metaKey !== needMeta) return false
-            if (!!ev.altKey !== needAlt) return false
-            if (!!ev.shiftKey !== needShift) return false
-
-            return true
-        }
+        const isMatch = matchShortcut
 
         if (shortcuts) {
             if (isMatch(shortcuts.markRead, e)) {
@@ -583,7 +591,9 @@ export function itemReducer(
         case SYNC_LOCAL_ITEMS: {
             const nextState = { ...state }
             for (const item of Object.values(state)) {
-                if (Object.prototype.hasOwnProperty.call(item, "serviceRef")) {
+                // Local rows also carry serviceRef, but as null; only
+                // remote items have a real service id to look up.
+                if (item.serviceRef) {
                     const nextItem = { ...item }
                     nextItem.hasRead = !action.unreadIds.has(item.serviceRef)
                     nextItem.starred = action.starredIds.has(item.serviceRef)

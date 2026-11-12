@@ -15,7 +15,7 @@ import {
 import SourceIcon from "./utils/source-icon"
 import { RSSSource, SourceOpenTarget, SourceTextDirection } from "../scripts/models/source"
 import { shareSubmenu } from "./context-menu"
-import { platformCtrl, decodeFetchResponse } from "../scripts/utils"
+import { platformCtrl, decodeFetchResponse, matchShortcut } from "../scripts/utils"
 import { getEffectiveItem as buildEffectiveItem } from "./utils/effective-item"
 import { ArticleAIHandler, ArticleAIState } from "./article-ai"
 import * as ArticleScripts from "./article-scripts"
@@ -335,26 +335,16 @@ class Article extends React.Component<ArticleProps, ArticleState> {
             shortcuts = null
         }
 
-        const isMatch = (shortcut: string | undefined, ev: Electron.Input) => {
-            if (!shortcut) return false
-            const parts = shortcut.toLowerCase().split("+")
-            const key = parts[parts.length - 1]
-            const needCtrl = parts.includes("ctrl") || parts.includes("control")
-            const needMeta =
-                parts.includes("meta") || parts.includes("command") || parts.includes("cmd")
-            const needAlt = parts.includes("alt")
-            const needShift = parts.includes("shift")
-
-            const inputKey = ev.key.toLowerCase()
-
-            if (inputKey !== key) return false
-            if (!!ev.control !== needCtrl) return false
-            if (!!ev.meta !== needMeta) return false
-            if (!!ev.alt !== needAlt) return false
-            if (!!ev.shift !== needShift) return false
-
-            return true
-        }
+        // Electron.Input names its modifiers control/meta/alt/shift; adapt
+        // them to the shared matcher's KeyboardEvent-shaped fields.
+        const isMatch = (shortcut: string | undefined, ev: Electron.Input) =>
+            matchShortcut(shortcut, {
+                key: ev.key,
+                ctrlKey: ev.control,
+                metaKey: ev.meta,
+                altKey: ev.alt,
+                shiftKey: ev.shift,
+            })
 
         if (shortcuts) {
             // Article-level controls

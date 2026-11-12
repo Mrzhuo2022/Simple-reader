@@ -79,43 +79,42 @@ export class RSSSource {
         return feed
     }
 
-    private static async checkItem(source: RSSSource, item: MyParserItem): Promise<RSSItem> {
-        const i = new RSSItem(item, source)
-        const items = (await db.itemsDB
-            .select()
+    static async checkItems(source: RSSSource, items: MyParserItem[]): Promise<RSSItem[]> {
+        if (items.length === 0) return []
+        // One batched query replaces the old per-item lookup, which issued
+        // one dedup query per fetched item (a 30-item feed = 30 queries per
+        // cycle). Lovefield DATE columns come back as Date objects, so key
+        // on the millisecond timestamp on both sides.
+        const existing = (await db.itemsDB
+            .select(db.items.guid, db.items.title, db.items.date)
             .from(db.items)
-            .where(
-                lf.op.and(
-                    db.items.source.eq(i.source),
-                    db.items.title.eq(i.title),
-                    db.items.date.eq(i.date)
-                )
-            )
-            .limit(1)
-            .exec()) as RSSItem[]
-        if (items.length === 0) {
+            .where(db.items.source.eq(source.sid))
+            .exec()) as { guid: string | null; title: string; date: Date }[]
+        // Two identity spaces: a stored guid matches a fetched guid outright,
+        // and every stored row also keeps its title+date identity so that
+        // feeds with unstable guids (re-minted each fetch) still dedupe.
+        const knownGuids = new Set<string>()
+        const legacyKeys = new Set<string>()
+        for (const row of existing) {
+            if (row.guid) knownGuids.add(row.guid)
+            legacyKeys.add(`${row.title}|${new Date(row.date).getTime()}`)
+        }
+        const result = new Array<RSSItem>()
+        for (const item of items) {
+            const i = new RSSItem(item, source)
+            const legacyKey = `${i.title}|${i.date.getTime()}`
+            const duplicate = i.guid
+                ? knownGuids.has(i.guid) || legacyKeys.has(legacyKey)
+                : legacyKeys.has(legacyKey)
+            // The sets also dedup repeated entries inside one fetch window.
+            if (duplicate) continue
+            if (i.guid) knownGuids.add(i.guid)
+            else legacyKeys.add(legacyKey)
             RSSItem.parseContent(i, item, source)
             if (source.rules) SourceRule.applyAll(source.rules, i)
-            return i
-        } else {
-            return null
+            result.push(i)
         }
-    }
-
-    static checkItems(source: RSSSource, items: MyParserItem[]): Promise<RSSItem[]> {
-        return new Promise<RSSItem[]>((resolve, reject) => {
-            const p = new Array<Promise<RSSItem>>()
-            for (const item of items) {
-                p.push(this.checkItem(source, item))
-            }
-            Promise.all(p)
-                .then(values => {
-                    resolve(values.filter(v => v != null))
-                })
-                .catch(e => {
-                    reject(e)
-                })
-        })
+        return result
     }
 
     static async fetchItems(source: RSSSource) {
@@ -204,32 +203,43 @@ export function initSourcesSuccess(sources: SourceState): SourceActionTypes {
     }
 }
 
-async function unreadCount(sources: SourceState): Promise<SourceState> {
+async function unreadCount(): Promise<Map<number, number>> {
     const rows = await db.itemsDB
         .select(db.items.source, lf.fn.count(db.items._id))
         .from(db.items)
         .where(db.items.hasRead.eq(false))
         .groupBy(db.items.source)
         .exec()
+    const counts = new Map<number, number>()
     for (const row of rows) {
-        sources[row["source"]].unreadCount = row["COUNT(_id)"]
+        counts.set(Number(row["source"]), Number(row["COUNT(_id)"]))
     }
-    return sources
+    return counts
 }
 
 export function updateUnreadCounts(): AppThunk<Promise<void>> {
     return async (dispatch, getState) => {
-        const sources: SourceState = {}
+        const counts = await unreadCount()
+        // Only clone sources whose unread count actually changed: cloning
+        // every source would invalidate every card's memo props at once on
+        // each sync, re-rendering the whole feed for no visible change.
+        const next: SourceState = {}
+        let changed = false
         for (const source of Object.values(getState().sources)) {
-            sources[source.sid] = {
-                ...source,
-                unreadCount: 0,
+            const expected = counts.get(source.sid) || 0
+            if (source.unreadCount !== expected) {
+                next[source.sid] = { ...source, unreadCount: expected }
+                changed = true
+            } else {
+                next[source.sid] = source
             }
         }
-        dispatch({
-            type: UPDATE_UNREAD_COUNTS,
-            sources: await unreadCount(sources),
-        })
+        if (changed) {
+            dispatch({
+                type: UPDATE_UNREAD_COUNTS,
+                sources: next,
+            })
+        }
     }
 }
 
@@ -474,8 +484,11 @@ export function sourceReducer(
                 [action.source.sid]: action.source,
             }
         case DELETE_SOURCE: {
-            delete state[action.source.sid]
-            return { ...state }
+            // Clone first: mutating the previous state would break memoized
+            // selectors and in-flight thunks still holding the old reference.
+            const nextState = { ...state }
+            delete nextState[action.source.sid]
+            return nextState
         }
         case FETCH_ITEMS: {
             switch (action.status) {

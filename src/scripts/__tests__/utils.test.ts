@@ -7,6 +7,7 @@ import {
     htmlDecode,
     platformCtrl,
     getWindowBreakpoint,
+    matchShortcut,
 } from "../utils"
 
 describe("utils", () => {
@@ -126,6 +127,49 @@ describe("utils", () => {
         it("returns false when outer width < 1440", () => {
             Object.defineProperty(window, "outerWidth", { value: 1024, writable: true })
             expect(getWindowBreakpoint()).toBe(false)
+        })
+    })
+
+    describe("matchShortcut", () => {
+        const ev = (
+            key: string,
+            mods: Partial<{ ctrl: boolean; meta: boolean; alt: boolean; shift: boolean }> = {}
+        ) => ({
+            key,
+            ctrlKey: !!mods.ctrl,
+            metaKey: !!mods.meta,
+            altKey: !!mods.alt,
+            shiftKey: !!mods.shift,
+        })
+
+        it("matches plain keys", () => {
+            expect(matchShortcut("F5", ev("F5"))).toBe(true)
+            expect(matchShortcut("Escape", ev("Escape"))).toBe(true)
+            expect(matchShortcut("F5", ev("F6"))).toBe(false)
+        })
+
+        it("matches modifier combinations", () => {
+            expect(matchShortcut("Ctrl+K", ev("k", { ctrl: true }))).toBe(true)
+            expect(matchShortcut("Ctrl+K", ev("k"))).toBe(false)
+            expect(matchShortcut("Ctrl+K", ev("k", { ctrl: true, shift: true }))).toBe(false)
+            expect(matchShortcut("Ctrl+Shift+F", ev("F", { ctrl: true, shift: true }))).toBe(true)
+        })
+
+        it("accepts alias names for modifiers", () => {
+            expect(matchShortcut("Control+K", ev("k", { ctrl: true }))).toBe(true)
+            expect(matchShortcut("Cmd+K", ev("k", { meta: true }))).toBe(true)
+            expect(matchShortcut("Command+K", ev("k", { meta: true }))).toBe(true)
+            expect(matchShortcut("Meta+K", ev("k", { meta: true }))).toBe(true)
+        })
+
+        it("is case-insensitive for both shortcut and event key", () => {
+            expect(matchShortcut("ctrl+k", ev("K", { ctrl: true }))).toBe(true)
+            expect(matchShortcut("CTRL+K", ev("k", { ctrl: true }))).toBe(true)
+        })
+
+        it("returns false for missing shortcuts", () => {
+            expect(matchShortcut(undefined, ev("k", { ctrl: true }))).toBe(false)
+            expect(matchShortcut("", ev("k", { ctrl: true }))).toBe(false)
         })
     })
 })

@@ -45,7 +45,40 @@ export type MyParserItem = extractGeneric<typeof rssParser> &
     Parser.Item & {
         itunes?: { image?: string }
         itunesImage?: Array<{ $?: { href?: string } }>
+        // rss-parser emits this for Atom entries but omits it from Parser.Item.
+        author?: string
+        // Atom <id>; rss-parser maps RSS <guid> to item.guid but leaves the
+        // Atom identity out of Parser.Item as well.
+        id?: string
     }
+
+/**
+ * Match a user-configured shortcut string ("Ctrl+K", "Cmd+Shift+F") against
+ * an input event. The normalized event shape covers both DOM KeyboardEvent
+ * (ctrlKey/metaKey/…) and Electron.Input, whose modifier fields are named
+ * control/meta/alt/shift — callers adapt with the mapping they need, so the
+ * parsing itself lives in exactly one place.
+ */
+export function matchShortcut(
+    shortcut: string | undefined,
+    ev: { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean; shiftKey: boolean }
+): boolean {
+    if (!shortcut) return false
+    const parts = shortcut.toLowerCase().split("+")
+    const key = parts[parts.length - 1]
+    const needCtrl = parts.includes("ctrl") || parts.includes("control")
+    const needMeta = parts.includes("meta") || parts.includes("command") || parts.includes("cmd")
+    const needAlt = parts.includes("alt")
+    const needShift = parts.includes("shift")
+
+    if (ev.key.toLowerCase() !== key) return false
+    return (
+        !!ev.ctrlKey === needCtrl &&
+        !!ev.metaKey === needMeta &&
+        !!ev.altKey === needAlt &&
+        !!ev.shiftKey === needShift
+    )
+}
 
 const CHARSET_RE = /charset=([^()<>@,;:"/[\]?.=\s]*)/i
 const XML_ENCODING_RE = /^<\?xml.+encoding="(.+?)".*?\?>/i
