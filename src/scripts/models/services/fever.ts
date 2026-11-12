@@ -139,44 +139,47 @@ export const feverServiceHooks: ServiceHooks = {
                     fidMap.set(source.serviceRef, source)
                 }
             }
-            const parsedItems = items.map(i => {
-                const source = fidMap.get(String(i.feed_id))
-                const item = {
-                    source: source.sid,
-                    title: i.title,
-                    link: i.url,
-                    date: new Date(i.created_on_time * 1000),
-                    fetchedDate: new Date(),
-                    content: i.html,
-                    snippet: htmlDecode(i.html).trim(),
-                    creator: i.author,
-                    hasRead: Boolean(i.is_read),
-                    starred: Boolean(i.is_saved),
-                    hidden: false,
-                    notify: false,
-                    serviceRef: String(i.id),
-                } as RSSItem
-                // Try to get the thumbnail of the item
-                const dom = domParser.parseFromString(item.content, "text/html")
-                const baseEl = dom.createElement("base")
-                baseEl.setAttribute("href", item.link.split("/").slice(0, 3).join("/"))
-                dom.head.append(baseEl)
-                const img = dom.querySelector("img")
-                if (img && img.src) {
-                    item.thumb = img.src
-                } else if (configs.useInt32) {
-                    // TTRSS Fever Plugin attachments
-                    const a = dom.querySelector("body>ul>li:first-child>a") as HTMLAnchorElement
-                    if (a && /, image\/generic$/.test(a.innerText) && a.href) item.thumb = a.href
-                }
-                // Apply rules and sync back to the service
-                if (source.rules) SourceRule.applyAll(source.rules, item)
-                if (Boolean(i.is_read) !== item.hasRead)
-                    markItem(configs, item, item.hasRead ? "read" : "unread")
-                if (Boolean(i.is_saved) !== Boolean(item.starred))
-                    markItem(configs, item, item.starred ? "saved" : "unsaved")
-                return item
-            })
+            const parsedItems = items
+                .filter(i => fidMap.has(String(i.feed_id)))
+                .map(i => {
+                    const source = fidMap.get(String(i.feed_id))
+                    const item = {
+                        source: source.sid,
+                        title: i.title,
+                        link: i.url,
+                        date: new Date(i.created_on_time * 1000),
+                        fetchedDate: new Date(),
+                        content: i.html,
+                        snippet: htmlDecode(i.html).trim(),
+                        creator: i.author,
+                        hasRead: Boolean(i.is_read),
+                        starred: Boolean(i.is_saved),
+                        hidden: false,
+                        notify: false,
+                        serviceRef: String(i.id),
+                    } as RSSItem
+                    // Try to get the thumbnail of the item
+                    const dom = domParser.parseFromString(item.content, "text/html")
+                    const baseEl = dom.createElement("base")
+                    baseEl.setAttribute("href", item.link.split("/").slice(0, 3).join("/"))
+                    dom.head.append(baseEl)
+                    const img = dom.querySelector("img")
+                    if (img && img.src) {
+                        item.thumb = img.src
+                    } else if (configs.useInt32) {
+                        // TTRSS Fever Plugin attachments
+                        const a = dom.querySelector("body>ul>li:first-child>a") as HTMLAnchorElement
+                        if (a && /, image\/generic$/.test(a.innerText) && a.href)
+                            item.thumb = a.href
+                    }
+                    // Apply rules and sync back to the service
+                    if (source.rules) SourceRule.applyAll(source.rules, item)
+                    if (Boolean(i.is_read) !== item.hasRead)
+                        markItem(configs, item, item.hasRead ? "read" : "unread")
+                    if (Boolean(i.is_saved) !== Boolean(item.starred))
+                        markItem(configs, item, item.starred ? "saved" : "unsaved")
+                    return item
+                })
             return [parsedItems, configs]
         } else {
             return [[], configs]
@@ -216,15 +219,24 @@ export const feverServiceHooks: ServiceHooks = {
         } else {
             const sources = sids.map(sid => state.sources[sid])
             const timestamp = Math.floor((date ? date.getTime() : Date.now()) / 1000) + 1
+            const requests = new Array<Promise<unknown>>()
             for (const source of sources) {
                 if (source.serviceRef) {
-                    fetchAPI(
-                        configs,
-                        "",
-                        `&mark=feed&as=read&id=${source.serviceRef}&before=${timestamp}`
+                    // Await the remote write: the local UI already marked
+                    // everything read, so floating failures would diverge
+                    // until the next sync.
+                    requests.push(
+                        fetchAPI(
+                            configs,
+                            "",
+                            `&mark=feed&as=read&id=${source.serviceRef}&before=${timestamp}`
+                        ).catch(err =>
+                            console.error("Failed to mark feed read on the service:", err)
+                        )
                     )
                 }
             }
+            await Promise.all(requests)
         }
     },
 

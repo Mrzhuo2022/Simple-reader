@@ -21,6 +21,10 @@ describe("aiClient", () => {
         ;(global.fetch as jest.Mock).mockClear()
     })
 
+    afterEach(() => {
+        jest.useRealTimers()
+    })
+
     describe("listModels", () => {
         it("should return a list of model IDs from OpenAI format", async () => {
             const mockResponse = {
@@ -45,6 +49,8 @@ describe("aiClient", () => {
         })
 
         it("should handle errors gracefully", async () => {
+            // The client logs before rethrowing; the log is not under test.
+            jest.spyOn(console, "error").mockImplementation(() => {})
             ;(global.fetch as jest.Mock).mockResolvedValue({
                 ok: false,
                 status: 500,
@@ -108,6 +114,7 @@ describe("aiClient", () => {
         })
 
         it("should throw including the response body on a non-ok response", async () => {
+            jest.spyOn(console, "error").mockImplementation(() => {})
             ;(global.fetch as jest.Mock).mockResolvedValue({
                 ok: false,
                 status: 429,
@@ -121,6 +128,7 @@ describe("aiClient", () => {
         })
 
         it("should throw when the response has no choices", async () => {
+            jest.spyOn(console, "error").mockImplementation(() => {})
             ;(global.fetch as jest.Mock).mockResolvedValue({
                 ok: true,
                 json: async () => ({}),
@@ -262,22 +270,10 @@ describe("aiClient", () => {
 
     describe("translateTextByParagraph", () => {
         it("should throw error when translation contains failure message (case insensitive)", async () => {
-            const mockResponse = {
-                choices: [{ message: { content: "Translation Failed: server error" } }],
-            }
-            ;(global.fetch as jest.Mock).mockResolvedValue({
-                ok: true,
-                json: async () => mockResponse,
-            })
-
-            // We use the imported translateTextByParagraph
-
-            // It retries, so we need to mock multiple failures or just expect it to eventually fail/retry
-            // Since we can't easily control the retry loop without more complex mocking,
-            // we'll check if it detects the failure.
-            // However, the function catches the error and retries.
-            // To verify the regex, we can check if it *rejects* the result and tries again.
-            // We can spy on console.warn to see if it logs a retry.
+            // Fake timers so the retry backoff (1s+) doesn't make the test
+            // sleep in real time; advanceTimersByTimeAsync flushes both the
+            // backoff timers and the interleaved fetch-mock microtasks.
+            jest.useFakeTimers()
 
             const consoleSpy = jest.spyOn(console, "warn").mockImplementation()
 
@@ -294,7 +290,9 @@ describe("aiClient", () => {
                     json: async () => ({ choices: [{ message: { content: "Success" } }] }),
                 })
 
-            const results = await translateTextByParagraph(mockConfig, ["Hello"])
+            const pending = translateTextByParagraph(mockConfig, ["Hello"])
+            await jest.advanceTimersByTimeAsync(10000)
+            const results = await pending
 
             expect(results[0].translated).toBe("Success")
             expect(consoleSpy).toHaveBeenCalledWith(
@@ -313,6 +311,10 @@ describe("aiClient", () => {
             const consoleSpy = jest.spyOn(console, "warn").mockImplementation()
             const failContent = "Translation failed: upstream error"
             const okContent = "好的"
+
+            // Fake timers: the retry-exhaustion path backs off 1s/1.5s/2.25s
+            // between attempts, which would otherwise cost ~5s of real time.
+            jest.useFakeTimers()
 
             ;(global.fetch as jest.Mock).mockImplementation((_url: string, init: { body?: string }) => {
                 const body = JSON.parse(init.body || "{}")
@@ -346,7 +348,9 @@ describe("aiClient", () => {
                 })
             })
 
-            const results = await translateTextByParagraph(mockConfig, ["hello", "world"])
+            const pending = translateTextByParagraph(mockConfig, ["hello", "world"])
+            await jest.advanceTimersByTimeAsync(30000)
+            const results = await pending
             const translations = results.map(r => r.translated)
 
             // The failed paragraph must be marked, the other must be the real

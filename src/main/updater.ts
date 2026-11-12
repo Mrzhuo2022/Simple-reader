@@ -72,7 +72,7 @@ function fetchLatestRelease(): Promise<{ tag: string; url: string } | null> {
                 method: "GET",
                 headers: {
                     "User-Agent": "Simple-Reader-Updater",
-                    Accept: "application/vnd.github+json",
+                    "Accept": "application/vnd.github+json",
                 },
             },
             response => {
@@ -90,9 +90,18 @@ function fetchLatestRelease(): Promise<{ tag: string; url: string } | null> {
                 response.on("end", () => {
                     try {
                         const data = JSON.parse(body)
+                        if (typeof data.tag_name !== "string") {
+                            resolve(null)
+                            return
+                        }
+                        // Build the URL from the tag instead of trusting the
+                        // response's html_url: a MITM could otherwise point
+                        // the update banner at an arbitrary (phishing) page.
                         resolve({
                             tag: data.tag_name,
-                            url: data.html_url,
+                            url: `https://github.com/${REPO}/releases/tag/${encodeURIComponent(
+                                data.tag_name
+                            )}`,
                         })
                     } catch {
                         resolve(null)
@@ -138,8 +147,7 @@ export async function checkForUpdate(): Promise<UpdateStatus> {
         }
     }
 
-    const hasUpdate =
-        latestVersion !== null && compareVersions(latestVersion, currentVersion) > 0
+    const hasUpdate = latestVersion !== null && compareVersions(latestVersion, currentVersion) > 0
 
     return {
         hasUpdate,

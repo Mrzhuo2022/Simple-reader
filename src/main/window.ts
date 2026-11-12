@@ -1,6 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import windowStateKeeper = require("electron-window-state")
-import { BrowserWindow, nativeTheme, app } from "electron"
+import { BrowserWindow, dialog, nativeTheme, app } from "electron"
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import path = require("path")
 import { setThemeListener } from "./settings"
@@ -84,7 +84,12 @@ export class WindowManager {
                 this.mainWindow.show()
                 this.mainWindow.focus()
             })
-            this.mainWindow.loadFile((app.isPackaged ? "dist/" : "") + "index.html")
+            this.mainWindow.loadFile((app.isPackaged ? "dist/" : "") + "index.html").catch(err => {
+                // A broken install (missing dist) must not die silently
+                // with an unhandled rejection in the main process.
+                console.error("Failed to load the renderer:", err)
+                dialog.showErrorBox("Simple Reader", String(err))
+            })
 
             this.mainWindow.on("maximize", () => {
                 this.mainWindow.webContents.send("maximized")

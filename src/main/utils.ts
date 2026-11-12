@@ -10,6 +10,22 @@ import { checkForUpdate } from "./updater"
 import fontList = require("font-list")
 
 /**
+ * Deny-by-default permissions for guest content. Without a handler Electron
+ * approves permission requests, so arbitrary article pages could ask for
+ * geolocation, media, clipboard reads, etc. The sandbox partition (article
+ * webviews) rejects everything; the default session only allows notification
+ * requests from the app's own renderer, which pushNotification relies on.
+ */
+function initSessionSecurity() {
+    const sandboxSession = session.fromPartition("sandbox")
+    sandboxSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false))
+    sandboxSession.setPermissionCheckHandler(() => false)
+    session.defaultSession.setPermissionRequestHandler((wc, permission, callback) => {
+        callback(permission === "notifications" && wc.getURL().startsWith("file://"))
+    })
+}
+
+/**
  * Return the application version from package.json.
  *
  * app.getVersion() returns the Electron binary version in development mode
@@ -29,14 +45,21 @@ function getAppVersion(): string {
 }
 
 export function setUtilsListeners(manager: WindowManager) {
+    initSessionSecurity()
+
     async function openExternal(url: string, background = false) {
         if (url.startsWith("https://") || url.startsWith("http://")) {
             if (background && process.platform === "darwin") {
                 shell.openExternal(url, { activate: false })
             } else if (background && manager.hasWindow()) {
-                manager.mainWindow.setAlwaysOnTop(true)
+                const win = manager.mainWindow
+                win.setAlwaysOnTop(true)
                 await shell.openExternal(url)
-                setTimeout(() => manager.mainWindow.setAlwaysOnTop(false), 1000)
+                setTimeout(() => {
+                    // The window can close within this second; touching a
+                    // destroyed handle would crash the main process.
+                    if (!win.isDestroyed()) win.setAlwaysOnTop(false)
+                }, 1000)
             } else {
                 shell.openExternal(url)
             }
@@ -47,13 +70,23 @@ export function setUtilsListeners(manager: WindowManager) {
         contents.setWindowOpenHandler(details => {
             if (contents.getType() === "webview")
                 openExternal(details.url, details.disposition === "background-tab")
-            return {
-                action: manager.hasWindow() ? "deny" : "allow",
-            }
+            // Never let remote content spawn a real window here; webview
+            // popups are already converted to external browser opens above.
+            return { action: "deny" }
         })
         contents.on("will-navigate", (event, url) => {
             event.preventDefault()
             if (contents.getType() === "webview") openExternal(url)
+        })
+        // The renderer may attach webviews (the article view). Strip anything
+        // a compromised renderer could use to escalate a guest webview into
+        // privileged execution before the attachment is finalized.
+        contents.on("will-attach-webview", (_, webPreferences) => {
+            delete webPreferences.preload
+            webPreferences.nodeIntegration = false
+            webPreferences.nodeIntegrationInWorker = false
+            webPreferences.sandbox = true
+            webPreferences.contextIsolation = true
         })
     })
 
@@ -64,6 +97,10 @@ export function setUtilsListeners(manager: WindowManager) {
     })
 
     ipcMain.handle("show-error-box", async (_, title, content, copy?: string) => {
+        // Renderer-supplied strings (exception text, feed titles) feed native
+        // dialogs; truncate so a runaway value can't create an unusable box.
+        title = String(title).slice(0, 500)
+        content = String(content).slice(0, 2000)
         if (manager.hasWindow() && copy != null) {
             const response = await dialog.showMessageBox(manager.mainWindow, {
                 type: "error",
@@ -85,13 +122,17 @@ export function setUtilsListeners(manager: WindowManager) {
     ipcMain.handle(
         "show-message-box",
         async (_, title, message, confirm, cancel, defaultCancel, type) => {
+            title = String(title).slice(0, 500)
+            message = String(message).slice(0, 2000)
             if (manager.hasWindow()) {
                 const response = await dialog.showMessageBox(manager.mainWindow, {
                     type: type,
                     title: title,
                     message: title,
                     detail: message,
-                    buttons: process.platform === "win32" ? ["Yes", "No"] : [confirm, cancel],
+                    // Localized labels on every platform; the old hard-coded
+                    // ["Yes","No"] threw away the renderer's translations.
+                    buttons: [confirm, cancel],
                     cancelId: 1,
                     defaultId: defaultCancel ? 1 : 0,
                 })
@@ -103,14 +144,26 @@ export function setUtilsListeners(manager: WindowManager) {
     )
 
     ipcMain.handle("show-save-dialog", async (_, filters: Electron.FileFilter[], path: string) => {
-        ipcMain.removeAllListeners("write-save-result")
+        // handleOnce stacks: a second dialog opened before the renderer
+        // answered the first would leave both handlers alive. removeHandler
+        // (not removeAllListeners, which does not affect handle channels)
+        // guarantees only the newest dialog's writer is registered.
+        ipcMain.removeHandler("write-save-result")
         if (manager.hasWindow()) {
             const response = await dialog.showSaveDialog(manager.mainWindow, {
                 defaultPath: path,
                 filters: filters,
             })
             if (!response.canceled) {
+                // An armed one-shot handler lets the renderer write to the
+                // user-chosen path at any later time; expire it if the
+                // renderer never answers. The timer is cancelled when the
+                // handler fires, because a large export can legitimately
+                // take longer than the window between the dialog resolving
+                // and the renderer finishing its serialization.
+                const expire = setTimeout(() => ipcMain.removeHandler("write-save-result"), 60000)
                 ipcMain.handleOnce("write-save-result", (_, result, errmsg) => {
+                    clearTimeout(expire)
                     fs.writeFile(response.filePath, result, err => {
                         if (err) dialog.showErrorBox(errmsg, String(err))
                     })
@@ -170,7 +223,12 @@ export function setUtilsListeners(manager: WindowManager) {
                                     )
                                     break
                                 case ImageCallbackTypes.SaveAs:
-                                    contents.session.downloadURL(params.srcURL)
+                                    // srcURL comes from untrusted page content;
+                                    // file:// would copy a local file into the
+                                    // downloads folder without a picker.
+                                    if (/^https?:\/\//i.test(params.srcURL)) {
+                                        contents.session.downloadURL(params.srcURL)
+                                    }
                                     break
                                 case ImageCallbackTypes.Copy:
                                     contents.copyImageAt(params.x, params.y)

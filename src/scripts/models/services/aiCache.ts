@@ -32,7 +32,8 @@ function loadCache(): void {
             for (const [key, value] of Object.entries(parsed)) {
                 if (value && typeof value === "object" && "itemId" in value) {
                     const entry = value as AICacheEntry
-                    entry.createdAt = typeof entry.createdAt === "number" ? entry.createdAt : Date.now()
+                    entry.createdAt =
+                        typeof entry.createdAt === "number" ? entry.createdAt : Date.now()
                     valid.set(key, entry)
                 }
             }
@@ -44,14 +45,38 @@ function loadCache(): void {
     }
 }
 
+// Debounced persistence: the cache holds per-article summaries plus full
+// paragraph translations, so it grows into the MBs, and rewriting it
+// synchronously on every save blocked IPC handling for the whole main
+// process. Collapses bursts (title + summary + several paragraphs per
+// article view) into one trailing async write.
+let saveTimer: NodeJS.Timeout | null = null
+let saving = false
+const SAVE_DEBOUNCE_MS = 500
+
 function saveCache(): void {
     if (!cacheFilePath) return
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(flushCache, SAVE_DEBOUNCE_MS)
+}
 
+async function flushCache(): Promise<void> {
+    if (!cacheFilePath) return
+    saveTimer = null
+    if (saving) {
+        // A write is still in flight; schedule another pass so the latest
+        // state is not lost.
+        saveCache()
+        return
+    }
+    saving = true
     try {
         const obj = Object.fromEntries(cacheData)
-        fs.writeFileSync(cacheFilePath, JSON.stringify(obj, null, 2), "utf8")
+        await fs.promises.writeFile(cacheFilePath, JSON.stringify(obj), "utf8")
     } catch (error) {
         console.error("Failed to save cache:", error)
+    } finally {
+        saving = false
     }
 }
 
@@ -120,10 +145,12 @@ export function getCache(itemId: string): AICacheEntry | null {
 export function getCacheSize(): number {
     if (!cacheFilePath) return 0
     try {
-        if (!fs.existsSync(cacheFilePath)) return 0
         return fs.statSync(cacheFilePath).size
     } catch (error) {
-        console.error("Failed to get cache size:", error)
+        // A missing cache file simply means nothing cached yet.
+        if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+            console.error("Failed to get cache size:", error)
+        }
         return 0
     }
 }
@@ -152,6 +179,17 @@ export function clearOldCache(daysToKeep: number = 30): void {
 }
 
 export function closeDB(): void {
-    // JSON文件方式不需要关闭
-    saveCache()
+    // Flush synchronously on quit: a pending debounced write is cancelled,
+    // and async writes are not guaranteed to complete before process exit.
+    if (saveTimer) {
+        clearTimeout(saveTimer)
+        saveTimer = null
+    }
+    if (!cacheFilePath) return
+    try {
+        const obj = Object.fromEntries(cacheData)
+        fs.writeFileSync(cacheFilePath, JSON.stringify(obj), "utf8")
+    } catch (error) {
+        console.error("Failed to save cache:", error)
+    }
 }

@@ -183,47 +183,51 @@ export const minifluxServiceHooks: ServiceHooks = {
         }
 
         // map item objects to rssitem type while appling rules (if exist)
-        const parsedItems = items.map(item => {
-            const source = sourceMap.get(item.feed.id.toString())
+        // Skip entries whose feed has no local source (added on the server
+        // mid-sync or failed to insert); the whole fetch would otherwise die.
+        const parsedItems = items
+            .filter(item => sourceMap.has(item.feed.id.toString()))
+            .map(item => {
+                const source = sourceMap.get(item.feed.id.toString())
 
-            const parsedItem = {
-                source: source.sid,
-                title: item.title,
-                link: item.url,
-                date: new Date(item.published_at ?? item.created_at),
-                fetchedDate: new Date(),
-                content: item.content,
-                snippet: htmlDecode(item.content).trim(),
-                creator: item.author,
-                hasRead: Boolean(item.status === "read"),
-                starred: Boolean(item.starred),
-                hidden: false,
-                notify: false,
-                serviceRef: String(item.id),
-            } as RSSItem
+                const parsedItem = {
+                    source: source.sid,
+                    title: item.title,
+                    link: item.url,
+                    date: new Date(item.published_at ?? item.created_at),
+                    fetchedDate: new Date(),
+                    content: item.content,
+                    snippet: htmlDecode(item.content).trim(),
+                    creator: item.author,
+                    hasRead: Boolean(item.status === "read"),
+                    starred: Boolean(item.starred),
+                    hidden: false,
+                    notify: false,
+                    serviceRef: String(item.id),
+                } as RSSItem
 
-            // Try to get the thumbnail of the item
-            const dom = domParser.parseFromString(item.content, "text/html")
-            const baseEl = dom.createElement("base")
-            baseEl.setAttribute("href", parsedItem.link.split("/").slice(0, 3).join("/"))
-            dom.head.append(baseEl)
-            const img = dom.querySelector("img")
-            if (img && img.src) parsedItem.thumb = img.src
+                // Try to get the thumbnail of the item
+                const dom = domParser.parseFromString(item.content, "text/html")
+                const baseEl = dom.createElement("base")
+                baseEl.setAttribute("href", parsedItem.link.split("/").slice(0, 3).join("/"))
+                dom.head.append(baseEl)
+                const img = dom.querySelector("img")
+                if (img && img.src) parsedItem.thumb = img.src
 
-            if (source.rules) {
-                SourceRule.applyAll(source.rules, parsedItem)
-                if ((item.status === "read") !== parsedItem.hasRead) {
-                    if (parsedItem.hasRead) minifluxServiceHooks.markRead(parsedItem)
-                    else minifluxServiceHooks.markUnread(parsedItem)
+                if (source.rules) {
+                    SourceRule.applyAll(source.rules, parsedItem)
+                    if ((item.status === "read") !== parsedItem.hasRead) {
+                        if (parsedItem.hasRead) minifluxServiceHooks.markRead(parsedItem)
+                        else minifluxServiceHooks.markUnread(parsedItem)
+                    }
+                    if (item.starred !== parsedItem.starred) {
+                        if (parsedItem.starred) minifluxServiceHooks.star(parsedItem)
+                        else minifluxServiceHooks.unstar(parsedItem)
+                    }
                 }
-                if (item.starred !== parsedItem.starred) {
-                    if (parsedItem.starred) minifluxServiceHooks.star(parsedItem)
-                    else minifluxServiceHooks.unstar(parsedItem)
-                }
-            }
 
-            return parsedItem
-        })
+                return parsedItem
+            })
 
         return [parsedItems, configs]
     },
@@ -283,12 +287,7 @@ export const minifluxServiceHooks: ServiceHooks = {
             entry_ids: [Number(item.serviceRef)],
             status: "unread",
         })
-        await fetchAPI(
-            getState().service as MinifluxConfigs,
-            "entries",
-            "PUT",
-            body
-        )
+        await fetchAPI(getState().service as MinifluxConfigs, "entries", "PUT", body)
     },
 
     // mark entries for source ids as read, relative to date, determined by "before" bool

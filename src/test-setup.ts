@@ -2,6 +2,16 @@
 // that many modules access at import time (e.g. reducer initial states).
 // Runs before every test file (see jest.config.js setupFiles).
 
+import intl from "react-intl-universal"
+import locales from "./scripts/i18n/_locales"
+
+// Initialize intl with the real en-US strings so service modules' APIError()
+// returns actual messages instead of logging "locales data null not exists"
+// warnings on every failed-auth test. Fire-and-forget is safe: every intl.get()
+// call site sits behind at least one await, and this promise only resolves
+// static JSON imports (no I/O), so it settles before any test observes it.
+void intl.init({ currentLocale: "en-US", locales, fallbackLocale: "en-US" })
+
 const settingsStub = {
     prefetch: jest.fn(async () => {}),
     saveGroups: jest.fn(),

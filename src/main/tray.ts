@@ -19,6 +19,11 @@ import { WindowManager } from "./window"
  * the main process has no access to react-intl-universal (renderer-only).
  */
 
+// 1x1 transparent PNG, scaled to 16x16 by the platform; used when no icon
+// file can be located so the Tray constructor never receives an empty image.
+const TRANSPARENT_ICON_DATA_URL =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+
 function isZh(): boolean {
     const setting = store.get("locale", "default") as string
     const locale = setting === "default" ? app.getLocale() : setting
@@ -71,16 +76,21 @@ export class TrayManager {
             icon = nativeImage.createFromPath(iconPath)
         }
         if (!icon || icon.isEmpty()) {
-            // Absolute last resort: a 1x1 transparent image so Tray() never
-            // throws "Argument must be a file path or a NativeImage". The
-            // tooltip + context menu still identify the app.
-            icon = nativeImage.createEmpty()
-            // createEmpty returns an empty (0x0) image which some platforms
-            // also reject; resize to 1x1 to be safe.
-            icon = icon.resize({ width: 16, height: 16 })
+            // Absolute last resort: a transparent 16x16 PNG. nativeImage
+            // resizing an empty image still yields an empty image (which
+            // Tray() rejects on some platforms), so embed real bytes.
+            icon = nativeImage.createFromDataURL(TRANSPARENT_ICON_DATA_URL)
         }
 
-        this.tray = new Tray(icon)
+        try {
+            this.tray = new Tray(icon)
+        } catch (err) {
+            // Without a tray icon the app still runs; the window is the only
+            // way back, so never take the whole startup down here.
+            console.error("Failed to create the system tray:", err)
+            this.tray = null
+            return
+        }
         // On macOS a template image adapts to light/dark menu bar.
         if (process.platform === "darwin") icon.setTemplateImage(true)
 

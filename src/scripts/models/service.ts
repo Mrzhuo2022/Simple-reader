@@ -164,9 +164,11 @@ function updateSources(hook: ServiceHooks["updateSources"]): AppThunk<Promise<vo
                     dispatch(addSourceToGroup(gid, source.sid))
                 }
             }
-            const configs = getState().service
-            delete configs.importGroups
-            dispatch(saveServiceConfigs(configs))
+            const { importGroups, ...nextConfigs } = getState().service
+            void importGroups
+            // getState().service is live redux state; dispatching it back
+            // unchanged (same reference) would skip subscriber notification.
+            dispatch(saveServiceConfigs(nextConfigs))
         }
     }
 }

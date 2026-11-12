@@ -134,8 +134,13 @@ export const gReaderServiceHooks: ServiceHooks = {
         if (result.status === 200) {
             const text = await result.text()
             const matches = text.match(/Auth=(\S+)/)
-            if (matches.length > 1) configs.auth = "GoogleLogin auth=" + matches[1]
-            return configs
+            if (matches && matches.length > 1) {
+                // Return a new object: the caller dispatches this straight
+                // into the reducer, so mutating state in place would leave
+                // subscribers unaware of the new auth token.
+                return { ...configs, auth: "GoogleLogin auth=" + matches[1] }
+            }
+            throw APIError()
         } else {
             throw APIError()
         }
@@ -237,6 +242,10 @@ export const gReaderServiceHooks: ServiceHooks = {
                 }
             }
             const parsedItems = new Array<RSSItem>()
+            // Rule-triggered service writes are collected here and awaited
+            // after the loop: firing them bare leaves unhandled rejections
+            // that abort nothing but spam the console.
+            const serviceWrites = new Array<Promise<unknown>>()
             items.map(i => {
                 const source = fidMap.get(i.origin.streamId)
                 if (source === undefined) return
@@ -278,12 +287,17 @@ export const gReaderServiceHooks: ServiceHooks = {
                     const starred = item.starred
                     SourceRule.applyAll(source.rules, item)
                     if (item.hasRead !== hasRead)
-                        editTag(configs, item.serviceRef, READ_TAG, item.hasRead)
+                        serviceWrites.push(
+                            editTag(configs, item.serviceRef, READ_TAG, item.hasRead)
+                        )
                     if (item.starred !== starred)
-                        editTag(configs, item.serviceRef, STAR_TAG, item.starred)
+                        serviceWrites.push(
+                            editTag(configs, item.serviceRef, STAR_TAG, item.starred)
+                        )
                 }
                 parsedItems.push(item)
             })
+            await Promise.allSettled(serviceWrites)
             if (parsedItems.length > 0) {
                 configs.lastFetched = Math.round(parsedItems[0].fetchedDate.getTime() / 1000)
             }
@@ -313,17 +327,30 @@ export const gReaderServiceHooks: ServiceHooks = {
                 .exec()
             const refs = rows.map(row => row["serviceRef"]).join("&i=")
             if (refs) {
-                editTag(getState().service as GReaderConfigs, refs, READ_TAG)
+                // The local UI already marked everything read; a floating
+                // request here would fail silently and diverge until the
+                // next sync, so wait for it and surface failures.
+                try {
+                    await editTag(getState().service as GReaderConfigs, refs, READ_TAG)
+                } catch (err) {
+                    console.error("Failed to mark items read on the service:", err)
+                }
             }
         } else {
             const sources = sids.map(sid => state.sources[sid])
+            const requests = new Array<Promise<unknown>>()
             for (const source of sources) {
                 if (source.serviceRef) {
                     const body = new URLSearchParams()
                     body.set("s", source.serviceRef)
-                    fetchAPI(configs, "/reader/api/0/mark-all-as-read", "POST", body)
+                    requests.push(
+                        fetchAPI(configs, "/reader/api/0/mark-all-as-read", "POST", body).catch(
+                            err => console.error("Failed to mark feed read on the service:", err)
+                        )
+                    )
                 }
             }
+            await Promise.all(requests)
         }
     },
 

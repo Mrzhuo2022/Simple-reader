@@ -1,13 +1,17 @@
 /**
  * article-ai.ts
- * 
+ *
  * Handles AI-related features for articles: summary generation and translation.
  */
 
 import intl from "react-intl-universal"
 import { RSSItem } from "../scripts/models/item"
 import { RSSSource } from "../scripts/models/source"
-import { summarizeArticle, translateText, translateTextByParagraph } from "../scripts/models/services/aiClient"
+import {
+    summarizeArticle,
+    translateText,
+    translateTextByParagraph,
+} from "../scripts/models/services/aiClient"
 import type { AiConfig } from "../scripts/models/services/aiClient"
 import { getEffectiveItem as buildEffectiveItem } from "./utils/effective-item"
 import * as ArticleScripts from "./article-scripts"
@@ -130,10 +134,7 @@ export class ArticleAIHandler {
      * Waits for the cache load to finish first so that a cached
      * summary/translation is not re-fetched from the API.
      */
-    async maybeAutoRunAI(opts?: {
-        hasSummary?: boolean
-        hasTranslation?: boolean
-    }): Promise<void> {
+    async maybeAutoRunAI(opts?: { hasSummary?: boolean; hasTranslation?: boolean }): Promise<void> {
         const aiConfigs = window.settings.getAIConfigs() as ExtendedAiConfig
         if (!aiConfigs.enabled || !aiConfigs.apiKey) return
 
@@ -215,7 +216,10 @@ export class ArticleAIHandler {
             const fullTextResult = await this.getFullTextForSummary(fullContent)
             if (!fullTextResult.success) {
                 this.updateState({ aiSummaryLoading: false, showSummary: false })
-                const failureResult = fullTextResult as { success: false; reason: "no-content" | "too-short" }
+                const failureResult = fullTextResult as {
+                    success: false
+                    reason: "no-content" | "too-short"
+                }
                 if (failureResult.reason === "no-content") {
                     alert(
                         intl.get("ai.fullContentRequired") ||
@@ -241,7 +245,9 @@ export class ArticleAIHandler {
                     ? articleIsZh
                         ? "en"
                         : "zh"
-                    : (aiConfigs.translateTarget === "en" ? "en" : "zh")
+                    : aiConfigs.translateTarget === "en"
+                    ? "en"
+                    : "zh"
 
             const summary = await summarizeArticle(
                 {
@@ -282,7 +288,7 @@ export class ArticleAIHandler {
      */
     async toggleTranslation(): Promise<void> {
         const state = this.getState()
-        
+
         if (state.showTranslation) {
             this.updateState({ showTranslation: false })
             await this.setTranslationVisibility(false)
@@ -323,7 +329,9 @@ export class ArticleAIHandler {
         try {
             await this.waitForArticleReady()
             await this.webviewExecutor.executeScript(ArticleScripts.getCleanupTranslationsScript())
-            await this.webviewExecutor.executeScript(ArticleScripts.getTranslationSpinnerScript(true))
+            await this.webviewExecutor.executeScript(
+                ArticleScripts.getTranslationSpinnerScript(true)
+            )
 
             const textsToTranslate = await this.fetchTextsToTranslate()
             const { shouldTranslate, targetLang } = await this.determineTranslationStrategy(
@@ -333,7 +341,9 @@ export class ArticleAIHandler {
 
             if (!shouldTranslate) {
                 this.updateState({ translationLoading: false })
-                await this.webviewExecutor.executeScript(ArticleScripts.getTranslationSpinnerScript(false))
+                await this.webviewExecutor.executeScript(
+                    ArticleScripts.getTranslationSpinnerScript(false)
+                )
                 return
             }
 
@@ -385,7 +395,9 @@ export class ArticleAIHandler {
                 this.getState().translationRunId === newRunId
             ) {
                 this.updateState({ translationLoading: false })
-                await this.webviewExecutor.executeScript(ArticleScripts.getTranslationSpinnerScript(false))
+                await this.webviewExecutor.executeScript(
+                    ArticleScripts.getTranslationSpinnerScript(false)
+                )
                 await this.saveTranslationCache()
                 // If some paragraphs failed, start watching for the user
                 // clicking the "retry" hint so we can re-run just the failed
@@ -447,12 +459,12 @@ export class ArticleAIHandler {
     async injectCachedTranslations(): Promise<void> {
         const state = this.getState()
         if (!state.aiTranslation || state.aiTranslation.length === 0) return
-        
+
         await this.waitForArticleReady()
         const texts = await this.webviewExecutor.executeScript<string[]>(
             ArticleScripts.getMarkParagraphsScript()
         )
-        
+
         if (!texts || texts.length === 0) {
             const allTranslated = state.aiTranslation
                 .map(x => x?.translated || "")
@@ -466,8 +478,9 @@ export class ArticleAIHandler {
             await this.setTranslationVisibility(true)
             return
         }
-        
+
         const used = new Set<number>()
+        const matches: Array<{ index: number; translated: string }> = []
         for (const t of state.aiTranslation) {
             const original = t?.original || ""
             let bestIdx = -1
@@ -481,13 +494,18 @@ export class ArticleAIHandler {
                 }
             }
             if (bestIdx >= 0 && bestScore >= 0.35) {
-                await this.webviewExecutor.executeScript(
-                    ArticleScripts.getInsertTranslationScript(bestIdx, t.translated)
-                )
+                matches.push({ index: bestIdx, translated: t.translated })
                 used.add(bestIdx)
             }
         }
-        
+        // One batched injection replaces a serialized webview round-trip per
+        // paragraph — a 100-paragraph article used to cost 100 IPC hops.
+        if (matches.length > 0) {
+            await this.webviewExecutor.executeScript(
+                ArticleScripts.getInsertTranslationsBatchScript(matches)
+            )
+        }
+
         if (used.size === 0) {
             const allTranslated = state.aiTranslation
                 .map(x => x?.translated || "")
@@ -517,8 +535,7 @@ export class ArticleAIHandler {
             t =>
                 t &&
                 typeof t.translated === "string" &&
-                (t.translated.includes("[翻译失败") ||
-                    t.translated.includes("Translation failed"))
+                (t.translated.includes("[翻译失败") || t.translated.includes("Translation failed"))
         )
     }
 
@@ -624,21 +641,21 @@ export class ArticleAIHandler {
     }
 
     private async fetchTextsToTranslate(): Promise<string[]> {
-        let texts = await this.webviewExecutor.executeScript<string[]>(
-            ArticleScripts.getMarkParagraphsScript()
-        ).catch(() => [] as string[])
+        let texts = await this.webviewExecutor
+            .executeScript<string[]>(ArticleScripts.getMarkParagraphsScript())
+            .catch(() => [] as string[])
 
         if (!texts || texts.length === 0) {
             await this.waitForArticleReady(2000, 200)
-            texts = await this.webviewExecutor.executeScript<string[]>(
-                ArticleScripts.getMarkParagraphsScript()
-            ).catch(() => [] as string[])
+            texts = await this.webviewExecutor
+                .executeScript<string[]>(ArticleScripts.getMarkParagraphsScript())
+                .catch(() => [] as string[])
 
             if (!texts || texts.length === 0) {
                 await new Promise(r => setTimeout(r, 500))
-                texts = await this.webviewExecutor.executeScript<string[]>(
-                    ArticleScripts.getMarkParagraphsScript()
-                ).catch(() => [] as string[])
+                texts = await this.webviewExecutor
+                    .executeScript<string[]>(ArticleScripts.getMarkParagraphsScript())
+                    .catch(() => [] as string[])
             }
         }
         return texts || []
@@ -857,13 +874,13 @@ export class ArticleAIHandler {
             if (runId !== undefined && this.getState().translationRunId !== runId) return
 
             this.updateState({ translationLoading: false, showTranslation: false })
-            await this.webviewExecutor.executeScript(ArticleScripts.getTranslationSpinnerScript(false))
+            await this.webviewExecutor.executeScript(
+                ArticleScripts.getTranslationSpinnerScript(false)
+            )
         }
     }
 
-    private insertTranslatedParagraphs(
-        items: Array<{ index: number; translated: string }>
-    ): void {
+    private insertTranslatedParagraphs(items: Array<{ index: number; translated: string }>): void {
         const valid = items.filter(it => it.translated && it.translated.trim().length > 0)
         if (valid.length === 0) return
         // Single IPC call inserts all paragraphs at once.
@@ -894,9 +911,11 @@ export class ArticleAIHandler {
     }
 
     private async getRootHTML(): Promise<string> {
-        return (await this.webviewExecutor.executeScript<string>(
-            ArticleScripts.getRootHTMLScript()
-        )) || ""
+        return (
+            (await this.webviewExecutor.executeScript<string>(
+                ArticleScripts.getRootHTMLScript()
+            )) || ""
+        )
     }
 
     private calculateTextSimilarity(text1: string, text2: string): number {

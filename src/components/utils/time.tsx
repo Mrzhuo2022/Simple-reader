@@ -5,20 +5,37 @@ interface TimeProps {
     date: Date
 }
 
+// One shared 60s tick instead of one interval per card: a long list used to
+// hold hundreds of live timers, each firing a setState every minute.
+const listeners = new Set<() => void>()
+let sharedTimer: NodeJS.Timeout | null = null
+
+function subscribe(listener: () => void): () => void {
+    listeners.add(listener)
+    if (!sharedTimer) {
+        sharedTimer = setInterval(() => {
+            for (const fn of listeners) fn()
+        }, 60000)
+    }
+    return () => {
+        listeners.delete(listener)
+        if (listeners.size === 0 && sharedTimer) {
+            clearInterval(sharedTimer)
+            sharedTimer = null
+        }
+    }
+}
+
 class Time extends React.Component<TimeProps> {
-    timerID: NodeJS.Timeout
+    unsubscribe: () => void
     state = { now: new Date() }
 
     componentDidMount() {
-        this.timerID = setInterval(() => this.tick(), 60000)
+        this.unsubscribe = subscribe(() => this.setState({ now: new Date() }))
     }
 
     componentWillUnmount() {
-        clearInterval(this.timerID)
-    }
-
-    tick() {
-        this.setState({ now: new Date() })
+        this.unsubscribe()
     }
 
     displayTime(past: Date, now: Date): string {

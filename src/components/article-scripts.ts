@@ -1,6 +1,6 @@
 /**
  * article-scripts.ts
- * 
+ *
  * Contains all JavaScript code strings that are injected into the WebView.
  * These scripts run in the context of the rendered article page.
  */
@@ -259,61 +259,6 @@ export function getMarkParagraphsScript(): string {
     })()`
 }
 
-/**
- * Inserts translated text after a marked paragraph
- */
-export function getInsertTranslationScript(index: number, translated: string): string {
-    const safe = JSON.stringify(String(translated || ""))
-    const failedRe = FAILED_RE.source
-    const failedLabel = JSON.stringify(
-        intl.get("ai.translationFailedHint") ||
-            "此段翻译失败，点此重试 / Translation failed for this paragraph — click to retry"
-    )
-    return `(() => {
-        const el = document.querySelector('[data-ai-para-index="' + ${index} + '"]');
-        if (!el) {
-            console.warn('[AI] Paragraph with index', ${index}, 'not found');
-            return false;
-        }
-        // Remove all existing adjacent translation blocks
-        let next = el.nextSibling;
-        while (next) {
-            if (next.nodeType === 1 && next.classList.contains('ai-translation')) {
-                const toRemove = next;
-                next = next.nextSibling;
-                toRemove.remove();
-                continue;
-            }
-            if (next.nodeType === 3 && !next.textContent.trim()) {
-                next = next.nextSibling;
-                continue;
-            }
-            break;
-        }
-        const div = document.createElement('div');
-        div.className = 'ai-translation';
-        const failedRe = new RegExp(${JSON.stringify(failedRe)}, 'i');
-        const failedLabel = ${failedLabel};
-        const text = ${safe};
-        if (failedRe.test(text)) {
-            div.classList.add('ai-translation-failed');
-            div.style.cssText = 'color:var(--messageDanger,#d13438);font-size:0.85em;margin:4px 0 12px 0;padding:6px 10px;border-left:3px solid var(--messageDanger,#d13438);background:rgba(209,52,56,0.06);border-radius:3px;cursor:pointer;opacity:0.9;';
-            div.textContent = failedLabel;
-            div.title = failedLabel;
-            div.addEventListener('click', () => {
-                window.__aiRetryFailed = true;
-                div.textContent = failedLabel + ' …';
-            });
-        } else {
-            div.style.cssText = 'color:var(--gray, #666);font-style:italic;margin:4px 0 12px 0;padding:0;font-size:0.95em;line-height:1.7;opacity:0.85;';
-            const html = text;
-            div.innerHTML = ${SANITIZE_HTML_BODY};
-        }
-        if (el.parentNode) el.parentNode.insertBefore(div, el.nextSibling);
-        return true;
-    })()`
-}
-
 // Detects whether a translated string is a failure marker. Mirrors the
 // markers written by translateTextByParagraph in aiClient.ts.
 const FAILED_RE = /\[\s*翻译失败\s*\]|\[\s*Translation failed\s*\]|翻译失败|translation\s*failed/i
@@ -508,7 +453,10 @@ export function getIsArticleReadyScript(): string {
 /**
  * Waits for the article to be ready with MutationObserver and polling
  */
-export function getWaitForArticleReadyScript(timeoutMs: number = 12000, pollMs: number = 200): string {
+export function getWaitForArticleReadyScript(
+    timeoutMs: number = 12000,
+    pollMs: number = 200
+): string {
     return `(() => {
         return new Promise(resolve => {
             const done = () => { resolve(true); };

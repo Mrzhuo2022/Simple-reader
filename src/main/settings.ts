@@ -12,7 +12,7 @@ import {
     AIConfigs,
     Shortcuts,
 } from "../schema-types"
-import { ipcMain, session, nativeTheme, app } from "electron"
+import { ipcMain, session, nativeTheme, app, safeStorage } from "electron"
 import { WindowManager } from "./window"
 
 export const store = new Store<SchemaTypes>()
@@ -56,6 +56,15 @@ function toggleProxyStatus() {
 function getProxy() {
     return store.get(PAC_STORE_KEY, "")
 }
+function applyProxyRules(rules: Electron.ProxyConfig) {
+    // Both the default session (app fetches) and the article webview
+    // partition follow the proxy; unhandled rejections on a bad rule would
+    // otherwise vanish silently.
+    const sessions = [session.defaultSession, session.fromPartition("sandbox")]
+    for (const s of sessions) {
+        s.setProxy(rules).catch(err => console.error("Failed to apply proxy rules:", err))
+    }
+}
 function setProxy(address = null) {
     if (!address) {
         address = getProxy()
@@ -63,9 +72,20 @@ function setProxy(address = null) {
         store.set(PAC_STORE_KEY, address)
     }
     if (getProxyStatus()) {
-        const rules = { pacScript: address }
-        session.defaultSession.setProxy(rules)
-        session.fromPartition("sandbox").setProxy(rules)
+        // Reject garbage early: an invalid pacScript makes every request
+        // fail until restart. An empty stored value is not a usable script.
+        try {
+            new URL(address)
+        } catch {
+            console.warn("Ignoring invalid PAC URL:", address)
+            return
+        }
+        applyProxyRules({ pacScript: address })
+    } else {
+        // Toggling off must actively reset the session; leaving the old
+        // rules in place kept the proxy alive until the next relaunch.
+        // "system" (not "direct") preserves corporate/system proxies.
+        applyProxyRules({ mode: "system" })
     }
 }
 ipcMain.handle("get-proxy-status", () => getProxyStatus())
@@ -75,6 +95,12 @@ ipcMain.on("toggle-proxy-status", () => {
 ipcMain.handle("get-proxy", () => getProxy())
 ipcMain.handle("set-proxy", (_, address?: string | null) => {
     setProxy(address)
+})
+// Re-apply the persisted proxy on startup: the pacOn flag survives
+// restarts, but session proxy rules die with the previous session, so the
+// setting used to be silently inactive after every relaunch.
+app.on("ready", () => {
+    if (getProxyStatus()) setProxy()
 })
 
 const VIEW_STORE_KEY = "view"
@@ -142,7 +168,13 @@ ipcMain.handle("set-font", (_, font: string) => {
 ipcMain.handle("get-all-settings", () => {
     const output: Record<string, unknown> = {}
     for (const [key, value] of store) {
-        output[key] = value
+        if (key === AI_CONFIGS_STORE_KEY) {
+            // Export the decrypted configs: backups must stay portable, and
+            // an exported ciphertext would be re-encrypted on import.
+            output[key] = getAIConfigs()
+        } else {
+            output[key] = value
+        }
     }
     return output
 })
@@ -262,14 +294,56 @@ const DEFAULT_AI_CONFIGS: AIConfigs = {
     maxTextLengthPerRequest: 1500,
     maxParagraphsPerRequest: 1,
 }
+
+// API keys are sealed with the OS keyring (safeStorage) instead of resting
+// as plain text in config.json. Encrypted values carry the prefix below so
+// legacy plain-text keys still read back unchanged.
+const AI_KEY_ENC_PREFIX = "enc:v1:"
+
+function encryptApiKey(key: string): string {
+    if (!key) return key
+    // Already-sealed values (e.g. a restored backup made by a build that
+    // exported the raw store) are stored verbatim, never double-encrypted.
+    if (key.startsWith(AI_KEY_ENC_PREFIX)) return key
+    try {
+        if (safeStorage.isEncryptionAvailable()) {
+            return AI_KEY_ENC_PREFIX + safeStorage.encryptString(key).toString("base64")
+        }
+    } catch (err) {
+        console.warn("safeStorage unavailable, storing the API key in plain text:", err)
+    }
+    return key
+}
+
+function decryptApiKey(value: string): string {
+    if (!value || !value.startsWith(AI_KEY_ENC_PREFIX)) return value
+    try {
+        return safeStorage.decryptString(
+            Buffer.from(value.slice(AI_KEY_ENC_PREFIX.length), "base64")
+        )
+    } catch (err) {
+        console.error("Failed to decrypt the stored API key:", err)
+        return ""
+    }
+}
+
 function getAIConfigs(): AIConfigs {
     // 合并默认值，兼容历史存储缺失字段
     const saved = store.get(AI_CONFIGS_STORE_KEY, DEFAULT_AI_CONFIGS) as Partial<AIConfigs>
-    return { ...DEFAULT_AI_CONFIGS, ...(saved || {}) }
+    const merged = { ...DEFAULT_AI_CONFIGS, ...(saved || {}) }
+    return { ...merged, apiKey: decryptApiKey(merged.apiKey || "") }
+}
+
+/**
+ * Persist AI configs, sealing the API key. Shared by the IPC handler and
+ * the settings-import path so an imported key is encrypted too.
+ */
+export function setAIConfigs(configs: AIConfigs): void {
+    store.set(AI_CONFIGS_STORE_KEY, { ...configs, apiKey: encryptApiKey(configs.apiKey || "") })
 }
 ipcMain.handle("get-ai-configs", () => getAIConfigs())
 ipcMain.handle("set-ai-configs", (_, configs: AIConfigs) => {
-    store.set(AI_CONFIGS_STORE_KEY, configs)
+    setAIConfigs(configs)
 })
 
 // AI Cache IPC handlers
