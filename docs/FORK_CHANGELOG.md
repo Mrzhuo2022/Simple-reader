@@ -13,7 +13,7 @@
 
   - **划词翻译**: 选中文字后通过快捷键或菜单触发悬浮翻译窗口。
   - **全文双语对照**: 文章视图下支持段落级双语对照显示，保持原文排版。
-  - **智能缓存**: 翻译结果存储于本地 SQLite 数据库 (`ai-cache.db`)，离线可用。
+  - **智能缓存**: 翻译结果存储于本地 JSON 缓存文件 (`ai-cache.json`)，离线可用。
 - **AI 设置面板** (`src/components/settings/ai.tsx`)
 
   - 支持配置 API Endpoint、API Key、模型名称 (GPT, DeepSeek, Claude 等)。
@@ -32,9 +32,9 @@
 
 - **本地缓存层** (`src/scripts/models/services/aiCache.ts`)
 
-  - 引入 `better-sqlite3` 作为本地缓存数据库。
+  - 使用本地 JSON 缓存文件 (`ai-cache.json`) 持久化摘要与翻译结果。
   - 实现了针对文章 ID 的摘要和翻译结果持久化存储。
-  - 优化了数据读取性能，减少 IPC 通信开销。
+  - 异步防抖写入，避免阻塞主进程；退出时同步落盘。
 - **服务层解耦**
 
   - 将 AI API 调用逻辑独立封装为 `aiClient.ts`。
