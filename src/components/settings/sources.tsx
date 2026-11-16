@@ -41,6 +41,7 @@ type SourcesTabProps = {
     addSource: (url: string, name?: string, options?: AddSourceOptions) => void
     updateSourceName: (source: RSSSource, name: string) => void
     updateSourceIcon: (source: RSSSource, iconUrl: string) => Promise<void>
+    updateSourceUrl: (source: RSSSource, url: string) => Promise<void>
     updateSourceOpenTarget: (source: RSSSource, target: SourceOpenTarget) => void
     updateFetchFrequency: (source: RSSSource, frequency: number) => void
     deleteSource: (source: RSSSource) => void
@@ -56,6 +57,7 @@ interface SourcesTabState {
     newUrl: string
     newSourceAddName: string
     newSourceName: string
+    newSourceUrl: string
     newSourceGroupKey: string
     newSourceFetchFrequency: string
     newSourceOpenTarget: string
@@ -88,6 +90,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
             newUrl: "",
             newSourceAddName: "",
             newSourceName: "",
+            newSourceUrl: "",
             newSourceGroupKey: "none",
             newSourceFetchFrequency: "0",
             newSourceOpenTarget: String(SourceOpenTarget.Local),
@@ -110,6 +113,7 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                     selectedSources: count > 1 ? sources : null,
                     newSourceName: count === 1 ? sources[0].name : "",
                     newSourceIcon: count === 1 ? sources[0].iconurl || "" : "",
+                    newSourceUrl: count === 1 ? sources[0].url : "",
                     sourceEditOption: EditDropdownKeys.Name,
                 })
             },
@@ -308,6 +312,30 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         })
     }
 
+    // Point the source at a new feed URL. The thunk validates the address,
+    // rejects duplicates and pulls the new feed's items under the same sid,
+    // so read state and groups survive the change.
+    updateSourceUrl = async () => {
+        const source = this.state.selectedSource
+        const trimmed = this.state.newSourceUrl.trim()
+        if (!urlTest(trimmed)) return
+        try {
+            await this.props.updateSourceUrl(source, trimmed)
+            this.setState({
+                selectedSource: { ...source, url: trimmed } as RSSSource,
+            })
+            this.showMessage(
+                MessageBarType.success,
+                intl.get("sources.urlUpdated")
+            )
+        } catch (err) {
+            this.showMessage(
+                MessageBarType.error,
+                err instanceof Error ? err.message : String(err)
+            )
+        }
+    }
+
     updateSourceIcon = () => {
         const newIcon = this.state.newSourceIcon.trim()
         this.props.updateSourceIcon(this.state.selectedSource, newIcon)
@@ -321,6 +349,10 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
         switch (name) {
             case "newUrl":
                 this.setState({ newUrl: value })
+                break
+            case "newSourceUrl":
+                this.setState({ newSourceUrl: value })
+                break
                 break
             case "newSourceAddName":
                 this.setState({ newSourceAddName: value })
@@ -721,23 +753,70 @@ class SourcesTab extends React.Component<SourcesTabProps, SourcesTabState> {
                                 </Stack.Item>
                             </>
                         )}
-                        {this.state.sourceEditOption === EditDropdownKeys.Url && (
-                            <>
-                                <Stack.Item grow>
-                                    <TextField disabled value={this.state.selectedSource.url} />
-                                </Stack.Item>
-                                <Stack.Item>
-                                    <DefaultButton
-                                        onClick={() =>
-                                            window.utils.writeClipboard(
-                                                this.state.selectedSource.url
-                                            )
-                                        }
-                                        text={intl.get("context.copy")}
-                                    />
-                                </Stack.Item>
-                            </>
-                        )}
+                        {this.state.sourceEditOption === EditDropdownKeys.Url &&
+                            (this.state.selectedSource.serviceRef ? (
+                                // Service-synced feeds are owned by the
+                                // service; changing the address must happen
+                                // there.
+                                <>
+                                    <Stack.Item grow>
+                                        <TextField
+                                            disabled
+                                            value={this.state.selectedSource.url}
+                                        />
+                                    </Stack.Item>
+                                    <Stack.Item>
+                                        <DefaultButton
+                                            onClick={() =>
+                                                window.utils.writeClipboard(
+                                                    this.state.selectedSource.url
+                                                )
+                                            }
+                                            text={intl.get("context.copy")}
+                                        />
+                                    </Stack.Item>
+                                </>
+                            ) : (
+                                <>
+                                    <Stack.Item grow>
+                                        <TextField
+                                            name="newSourceUrl"
+                                            placeholder={intl.get("sources.inputUrl")}
+                                            value={this.state.newSourceUrl}
+                                            onChange={this.handleInputChange}
+                                            onGetErrorMessage={v => {
+                                                const trimmed = (v || "").trim()
+                                                if (!trimmed) return ""
+                                                return urlTest(trimmed)
+                                                    ? ""
+                                                    : intl.get("sources.badUrl")
+                                            }}
+                                            validateOnLoad={false}
+                                        />
+                                    </Stack.Item>
+                                    <Stack.Item>
+                                        <DefaultButton
+                                            disabled={
+                                                !urlTest(this.state.newSourceUrl.trim()) ||
+                                                this.state.newSourceUrl.trim() ===
+                                                    this.state.selectedSource.url
+                                            }
+                                            onClick={this.updateSourceUrl}
+                                            text={intl.get("edit")}
+                                        />
+                                    </Stack.Item>
+                                    <Stack.Item>
+                                        <DefaultButton
+                                            onClick={() =>
+                                                window.utils.writeClipboard(
+                                                    this.state.selectedSource.url
+                                                )
+                                            }
+                                            text={intl.get("context.copy")}
+                                        />
+                                    </Stack.Item>
+                                </>
+                            ))}
                     </Stack>
                     {!this.state.selectedSource.serviceRef && (
                         <>

@@ -7,6 +7,7 @@ import {
     addSource,
     RSSSource,
     updateSource,
+    updateSourceUrl,
     deleteSource,
     SourceOpenTarget,
     deleteSources,
@@ -45,6 +46,14 @@ const mapDispatchToProps = (dispatch: AppDispatch) => {
             dispatch(addSource(url, name ?? null, false, options)),
         updateSourceName: (source: RSSSource, name: string) => {
             dispatch(updateSource({ ...source, name: name } as RSSSource))
+        },
+        updateSourceUrl: async (source: RSSSource, url: string) => {
+            dispatch(saveSettings())
+            try {
+                await dispatch(updateSourceUrl(source, url))
+            } finally {
+                dispatch(saveSettings())
+            }
         },
         updateSourceIcon: async (source: RSSSource, iconUrl: string) => {
             dispatch(saveSettings())

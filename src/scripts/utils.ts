@@ -108,10 +108,10 @@ export async function decodeFetchResponse(response: Response, isHTML = false) {
     return content
 }
 
-export async function parseRSS(url: string) {
+export async function parseRSS(url: string, signal?: AbortSignal) {
     let result: Response
     try {
-        result = await fetch(url, { credentials: "omit" })
+        result = await fetch(url, { credentials: "omit", signal })
     } catch {
         throw new Error(intl.get("log.networkError"))
     }
@@ -131,7 +131,12 @@ export const domParser = new DOMParser()
 export async function fetchFavicon(url: string) {
     try {
         const baseUrl = url.split("/").slice(0, 3).join("/")
-        const result = await fetch(baseUrl, { credentials: "omit" })
+        // Bounded probing: a slow or hanging site must not stall the whole
+        // favicon backfill batch (it runs on startup after the first fetch).
+        const result = await fetch(baseUrl, {
+            credentials: "omit",
+            signal: AbortSignal.timeout(8000),
+        })
         if (result.ok) {
             const html = await result.text()
             const dom = domParser.parseFromString(html, "text/html")
@@ -165,7 +170,10 @@ export async function fetchFavicon(url: string) {
 }
 export async function validateFavicon(url: string) {
     try {
-        const result = await fetch(url, { credentials: "omit" })
+        const result = await fetch(url, {
+            credentials: "omit",
+            signal: AbortSignal.timeout(8000),
+        })
         if (
             result.status == 200 &&
             result.headers.has("Content-Type") &&

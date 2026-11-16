@@ -1,7 +1,15 @@
 import intl from "react-intl-universal"
 import * as db from "../db"
 import lf from "lovefield"
-import { fetchFavicon, ActionStatus, AppThunk, parseRSS, MyParserItem } from "../utils"
+import {
+    fetchFavicon,
+    validateFavicon,
+    ActionStatus,
+    AppThunk,
+    parseRSS,
+    MyParserItem,
+    urlTest,
+} from "../utils"
 import {
     RSSItem,
     insertItems,
@@ -10,6 +18,7 @@ import {
     MARK_READ,
     MARK_UNREAD,
     MARK_ALL_READ,
+    fetchItems,
 } from "./item"
 import { saveSettings } from "./app"
 import { SourceRule } from "./rule"
@@ -385,6 +394,39 @@ export function updateSource(source: RSSSource): AppThunk<Promise<void>> {
     }
 }
 
+/**
+ * Point an existing source at a new feed URL. The sid is kept, so the
+ * item history, read state, groups and unread counts all survive the
+ * change; the new feed's items flow through the regular dedup and the
+ * old feed's items stay until they age out of the cleanup.
+ * Only meaningful for local sources — service-synced sources are owned
+ * by the service and must be updated there.
+ */
+export function updateSourceUrl(source: RSSSource, url: string): AppThunk<Promise<void>> {
+    return async (dispatch, getState) => {
+        const trimmed = url.trim()
+        if (!urlTest(trimmed)) {
+            throw new Error(intl.get("sources.badUrl"))
+        }
+        const rows = (await db.sourcesDB
+            .select()
+            .from(db.sources)
+            .where(db.sources.url.eq(trimmed))
+            .exec()) as RSSSource[]
+        if (rows.some(s => s.sid !== source.sid)) {
+            throw new Error(intl.get("sources.urlExists"))
+        }
+        // Reset lastFetched so the new feed is pulled immediately; if a
+        // fetch/sync cycle is already running, the epoch stamp makes the
+        // next regular cycle pick this source up anyway.
+        await dispatch(updateSource({ ...source, url: trimmed, lastFetched: new Date(0) }))
+        const app = getState().app
+        if (!app.fetchingItems && !app.syncing) {
+            await dispatch(fetchItems(false, [source.sid]))
+        }
+    }
+}
+
 export function deleteSourceDone(source: RSSSource): SourceActionTypes {
     return {
         type: DELETE_SOURCE,
@@ -443,15 +485,55 @@ export function updateFavicon(sids?: number[], force = false): AppThunk<Promise<
         }
         const promises = sids.map(async sid => {
             const url = initSources[sid].url
-            const favicon = (await fetchFavicon(url)) || ""
+            const favicon = await resolveFavicon(url)
             const source = getState().sources[sid]
-            if (source && source.url === url && (force || source.iconurl === undefined)) {
-                source.iconurl = favicon
-                await dispatch(updateSource(source))
+            // The probe above treats undefined/null/"" as missing; the write
+            // gate used to check only undefined, so sources whose iconurl
+            // was an empty string were re-probed on every startup but their
+            // result was never saved — they kept no icon forever. Only a
+            // successful probe writes, and a forced re-probe that fails must
+            // not wipe an existing icon. Clone instead of mutating the state
+            // object in place.
+            if (source && source.url === url && favicon && (force || !source.iconurl)) {
+                await dispatch(updateSource({ ...source, iconurl: favicon }))
             }
         })
         await Promise.all(promises)
     }
+}
+
+/**
+ * Resolve the best available favicon for a feed URL:
+ * 1. the feed's own declared logo (RSS <image><url> / iTunes cover) — a
+ *    direct image URL the feed advertises, which succeeds far more often
+ *    than scraping the site root, especially for feeds served by
+ *    generators whose site root blocks or hides their favicon markup;
+ * 2. the site root's <link rel=icon> / favicon.ico (fetchFavicon).
+ */
+async function resolveFavicon(url: string): Promise<string> {
+    try {
+        // Bounded probe, same as the site-root path below: a hung feed
+        // server must not stall the startup favicon batch.
+        const feed = await parseRSS(url, AbortSignal.timeout(8000))
+        const itunesImage = (feed as { itunes?: { image?: string } }).itunes?.image
+        const feedImage = (feed as { image?: { url?: string } | string }).image
+        const candidates: string[] = []
+        const logo =
+            typeof feedImage === "string"
+                ? feedImage
+                : feedImage && typeof feedImage === "object"
+                ? feedImage.url
+                : undefined
+        for (const c of [logo, itunesImage]) {
+            if (c && /^https?:\/\//i.test(c)) candidates.push(c)
+        }
+        for (const candidate of candidates) {
+            if (await validateFavicon(candidate)) return candidate
+        }
+    } catch {
+        // Feed unreachable or unparseable — fall through to the site probe.
+    }
+    return (await fetchFavicon(url)) || ""
 }
 
 export function sourceReducer(
