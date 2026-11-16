@@ -68,7 +68,9 @@
         "font": "字体"
     },
     "menu": {
-        "starred": "收藏"
+        "starred": "收藏",
+        "subscriptions": "订阅源",
+        "close": "关闭"
     },
     "article": {
         "markRead": "标为已读",
@@ -87,7 +89,9 @@
         "dontAutoFullText": "不自动抓取全文",
         "openOriginal": "打开原文",
         "audio": "音频",
-        "audioFailure": "音频加载失败"
+        "audioFailure": "音频加载失败",
+        "error": "文章加载失败",
+        "reload": "重新加载"
     },
     "context": {
         "share": "分享",
@@ -117,8 +121,10 @@
     },
     "searchEngine": {
         "name": "搜索引擎",
+        "google": "谷歌",
         "bing": "必应",
-        "baidu": "百度"
+        "baidu": "百度",
+        "duckduckgo": "DuckDuckGo"
     },
     "settings": {
         "writeError": "写入文件时发生错误",
@@ -171,6 +177,8 @@
         "inputUrl": "输入URL",
         "badIcon": "图标不存在或非图片",
         "badUrl": "请正确输入URL",
+        "urlExists": "已存在相同地址的订阅源",
+        "urlUpdated": "订阅地址已更新",
         "deleteWarning": "这将移除订阅源与所有已保存的文章",
         "selected": "选中订阅源",
         "selectedMulti": "选中多个订阅源",

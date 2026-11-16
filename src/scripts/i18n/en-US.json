@@ -68,7 +68,9 @@
         "font": "Font"
     },
     "menu": {
-        "starred": "Starred"
+        "starred": "Starred",
+        "subscriptions": "Subscriptions",
+        "close": "Close"
     },
     "article": {
         "markRead": "Mark as read",
@@ -87,7 +89,9 @@
         "dontAutoFullText": "Don't auto fetch full text",
         "openOriginal": "Open original article",
         "audio": "Audio",
-        "audioFailure": "Failed to load audio"
+        "audioFailure": "Failed to load audio",
+        "error": "Failed to load the article",
+        "reload": "Reload"
     },
     "context": {
         "share": "Share",
@@ -173,6 +177,8 @@
         "inputUrl": "Enter URL",
         "badIcon": "Invalid icon",
         "badUrl": "Invalid URL",
+        "urlExists": "A source with this URL already exists",
+        "urlUpdated": "Source URL updated",
         "deleteWarning": "The source and all saved articles will be removed.",
         "selected": "Selected source",
         "selectedMulti": "Selected multiple sources",
