@@ -103,6 +103,6 @@ pnpm run package-linux  # Linux
 BSD 3-Clause License
 
 Copyright © 2020, Haoyuan Liu
-Copyright © 2025, Evarle Zhuo
+Copyright © 2026, Evarle Zhuo
 
 Based on [Fluent Reader](https://github.com/yang991178/fluent-reader) by Haoyuan Liu.

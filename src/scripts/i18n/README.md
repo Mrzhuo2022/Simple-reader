@@ -1,6 +1,6 @@
 ## Internationalization
 
-Currently, Fluent Reader supports the following languages.
+Currently, Simple Reader supports the following languages.
 
 | Locale | Language | Credit |
 | --- | --- | --- |
@@ -9,6 +9,7 @@ Currently, Fluent Reader supports the following languages.
 | es | Español | [@kant](https://github.com/kant) |
 | fr-FR | Français | [@Toinane](https://github.com/Toinane) |
 | fi-FI | Suomi | [@SUPERHAMSTERI](https://github.com/SUPERHAMSTERI) |
+| pl | Polski | Grzegorz Przybylski |
 | zh-CN | 中文（简体） | [@yang991178](https://github.com/yang991178) |
 | zh-TW | 中文（繁體） | [@jerryc127](https://github.com/jerryc127) |
 | ja | 日本語 | [@tiancheng2000](https://github.com/tiancheng2000) |
