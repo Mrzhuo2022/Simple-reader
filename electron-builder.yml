@@ -1,9 +1,8 @@
 appId: me.evarle.Simple-reader
 productName: Simple Reader
-copyright: Copyright © 2025 Evarle Zhuo
+copyright: Copyright © 2026 Evarle Zhuo
 files:
     - "./dist/**/*"
-    - "!./dist/fontlist"
     - "!**/*.js.map"
 # Ship the tray/app icons outside the asar so the main process can read them
 # via process.resourcesPath in packaged builds (asar contents aren't on disk).
@@ -37,6 +36,11 @@ mac:
         - pt_PT
         - cs
 win:
+    # Ready-made multi-size .ico (see build/make-ico.mjs): providing it
+    # skips electron-builder's WASM PNG->ico conversion, which fails with
+    # "WebAssembly.Memory(): could not allocate memory" under some
+    # Node 24 setups.
+    icon: build/icon.ico
     target:
         - nsis
         - zip
